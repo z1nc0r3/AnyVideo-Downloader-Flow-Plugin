@@ -48,16 +48,17 @@ class AnyVideo(FlowLauncher):
             ydl_opts = {
                 "quiet": True,
                 "no_warnings": True,
+                "format-sort": "res,tbr",
             }
 
             try:
                 with YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(query, download=False)
+                    thumbnail = info.get("thumbnail")
             except Exception as e:
                 output.append({"Title": f"Error: {e}", "IcoPath": "Images/app.png"})
                 return output
             
-            thumbnail = info.get("thumbnails")[0]["url"]
 
             for format in reversed(info["formats"]):
                 if format["resolution"] is not None and format["tbr"] is not None:
