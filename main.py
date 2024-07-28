@@ -3,7 +3,7 @@
 # Description: A plugin to download videos from lots of websites
 # Date: 2024-07-28
 
-import sys, os
+import sys, os, re
 
 parent_folder_path = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(parent_folder_path)
@@ -16,25 +16,41 @@ from yt_dlp import YoutubeDL
 
 class AnyVideo(FlowLauncher):
 
+    def isValidURL(self, url):
+        regex = (
+            "((http|https)://)(www.)?"
+            + "[a-zA-Z0-9@:%._\\+~#?&//=]"
+            + "{1,256}\\.[a-z]"
+            + "{2,6}\\b([-a-zA-Z0-9@:%"
+            + "._\\+~#?&//=]*)"
+        )
+
+        p = re.compile(regex)
+
+        if re.search(p, url):
+            return True
+        else:
+            return False
+
     def query(self, query):
         output = []
         if len(query.strip()) == 0:
             output.append({"Title": "Enter a video URL", "IcoPath": "Images/app.png"})
+            return output
+
+        if not self.isValidURL(query):
+            output.append(
+                {"Title": "Please enter a valid URL", "IcoPath": "Images/app.png"}
+            )
+            return output
 
         else:
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
-            }
-
             try:
-                with YoutubeDL(ydl_opts) as ydl:
+                with YoutubeDL() as ydl:
                     info = ydl.extract_info(query, download=False)
             except Exception as e:
                 output.append({"Title": f"Error: {e}", "IcoPath": "Images/app.png"})
                 return output
-            
-            thumbnail = info.get("thumbnails")[0]["url"]
 
             for format in reversed(info["formats"]):
                 if format["resolution"] is not None and format["tbr"] is not None:
@@ -42,7 +58,7 @@ class AnyVideo(FlowLauncher):
                         {
                             "Title": info["title"],
                             "SubTitle": f"Resolution: {format['resolution']}    Bitrate: {format['tbr']}",
-                            "IcoPath": thumbnail,
+                            "IcoPath": "Images/app.png",
                             "JsonRPCAction": {
                                 "method": "download",
                                 "parameters": [query, f"{format['format_id']}"],
