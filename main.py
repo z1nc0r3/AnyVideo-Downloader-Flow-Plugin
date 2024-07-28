@@ -33,6 +33,8 @@ class AnyVideo(FlowLauncher):
             except Exception as e:
                 output.append({"Title": f"Error: {e}", "IcoPath": "Images/app.png"})
                 return output
+            
+            thumbnail = info.get("thumbnails")[0]["url"]
 
             for format in reversed(info["formats"]):
                 if format["resolution"] is not None and format["tbr"] is not None:
@@ -40,7 +42,7 @@ class AnyVideo(FlowLauncher):
                         {
                             "Title": info["title"],
                             "SubTitle": f"Resolution: {format['resolution']}    Bitrate: {format['tbr']}",
-                            "IcoPath": "Images/app.png",
+                            "IcoPath": thumbnail,
                             "JsonRPCAction": {
                                 "method": "download",
                                 "parameters": [query, f"{format['format_id']}"],
