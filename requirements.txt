@@ -1,3 +1,2 @@
 flowlauncher
-requests
 yt-dlp
