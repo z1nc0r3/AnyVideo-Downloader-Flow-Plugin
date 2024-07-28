@@ -77,7 +77,7 @@ class AnyVideo(FlowLauncher):
         return output
 
     def download(self, url, format_id):
-        command = f"yt-dlp -f {format_id} {url} -P ~/Downloads --windows-filenames --quiet --progress"
+        command = f"yt-dlp -f {format_id} {url} -P ~/Downloads/AnyDownloader --windows-filenames --quiet --progress --no-mtime --force-overwrites --no-part"
         os.system(command)
 
 
