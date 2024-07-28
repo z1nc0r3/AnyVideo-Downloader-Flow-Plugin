@@ -1,4 +1,4 @@
-# FlowGoal
+# AnyVideo Downloader
 
-A Plugin for Flow Launcher to check Football live scores.
+A Flow Launcher plugin for download videos from lots of websites.
 
