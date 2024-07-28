@@ -25,8 +25,6 @@ class AnyVideo(FlowLauncher):
             ydl_opts = {
                 "quiet": True,
                 "no_warnings": True,
-                "outtmpl": "%(title)s.%(ext)s",
-                "format-sort": "tbr",
             }
 
             try:
@@ -35,21 +33,13 @@ class AnyVideo(FlowLauncher):
             except Exception as e:
                 output.append({"Title": f"Error: {e}", "IcoPath": "Images/app.png"})
                 return output
-            
-            output.append(
-                {
-                    "Title": info['title'],
-                    "SubTitle": "Select the format to download",
-                    "IcoPath": "Images/app.png",
-                }
-            )
 
-            for format in info["formats"]:
+            for format in reversed(info["formats"]):
                 if format["resolution"] is not None and format["tbr"] is not None:
                     output.append(
                         {
-                            "Title": f"Resolution: {format['resolution']}",
-                            "SubTitle": f"Bitrate: {format['tbr']}",
+                            "Title": info["title"],
+                            "SubTitle": f"Resolution: {format['resolution']}    Bitrate: {format['tbr']}",
                             "IcoPath": "Images/app.png",
                             "JsonRPCAction": {
                                 "method": "download",
@@ -61,7 +51,7 @@ class AnyVideo(FlowLauncher):
         return output
 
     def download(self, url, format_id):
-        command = f"yt-dlp -f {format_id} {url} -P ~/Downloads -o %(title)s.%(ext)s --windows-filenames --no-overwrites --quiet --progress"
+        command = f"yt-dlp -f {format_id} {url} -P ~/Downloads --windows-filenames --quiet --progress"
         os.system(command)
 
 
