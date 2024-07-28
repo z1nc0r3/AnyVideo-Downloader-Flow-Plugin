@@ -1,0 +1,3 @@
+flowlauncher
+requests
+yt-dlp

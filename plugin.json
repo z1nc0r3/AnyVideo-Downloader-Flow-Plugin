@@ -1,0 +1,12 @@
+{
+    "ID": "70CED0AC-3D9D-4255-AD0B-D9A37862E879",
+    "ActionKeyword": "vd",
+    "Name": "AnyVideo Downloader",
+    "Description": "Plugin for downloading videos from YouTube, Facebook, Twitter, Instagram, and many other websites.",
+    "Author": "z1nc0r3",
+    "Version": "1.0.0",
+    "Language": "python",
+    "Website": "https://github.com/z1nc0r3/AnyVideoDownloader",
+    "IcoPath": "Images\\app.png",
+    "ExecuteFileName": "main.py"
+}
