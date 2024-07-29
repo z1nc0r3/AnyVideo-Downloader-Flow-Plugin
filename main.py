@@ -60,13 +60,21 @@ class AnyVideo(FlowLauncher):
 
     def query(self, query):
         if len(query.strip()) == 0:
-            return [{"Title": "Please input the URL of the video,", "IcoPath": "Images/app.png"}]
+            return [
+                {
+                    "Title": "Please input the URL of the video,",
+                    "IcoPath": "Images/app.png",
+                }
+            ]
 
         output = []
 
         if not self.isValidURL(query):
             output.append(
-                {"Title": "Please check the URL for errors.", "IcoPath": "Images/error.png"}
+                {
+                    "Title": "Please check the URL for errors.",
+                    "IcoPath": "Images/error.png",
+                }
             )
             return output
 
