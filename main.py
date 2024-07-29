@@ -11,7 +11,34 @@ sys.path.append(os.path.join(parent_folder_path, "lib"))
 sys.path.append(os.path.join(parent_folder_path, "plugin"))
 
 from flowlauncher import FlowLauncher
-from yt_dlp import YoutubeDL
+from yt_dlp import YoutubeDL, DownloadError
+
+
+class CustomYoutubeDL(YoutubeDL):
+    def __init__(self, params=None, auto_init=True):
+        super().__init__(params, auto_init)
+        self.error_message = None
+
+    def report_error(self, message, *args, **kwargs):
+        self.error_message = message
+
+    def extract_info(
+        self,
+        url,
+        download=False,
+        ie_key=None,
+        extra_info=None,
+        process=True,
+        force_generic_extractor=False,
+    ):
+        try:
+            result = super().extract_info(
+                url, download, ie_key, extra_info, process, force_generic_extractor
+            )
+            return result
+        except Exception as e:
+            self.error_message = f"Unexpected error: {str(e)}"
+            return None
 
 
 class AnyVideo(FlowLauncher):
@@ -44,6 +71,10 @@ class AnyVideo(FlowLauncher):
             )
             return output
 
+        # Temporary fix for "This request has been blocked due to its TLS fingerprint" when using https for some sites.
+        if query.startswith("https://"):
+            query.replace("https://", "http://")
+
         else:
             ydl_opts = {
                 "quiet": True,
@@ -51,14 +82,19 @@ class AnyVideo(FlowLauncher):
                 "format-sort": "res,tbr",
             }
 
-            try:
-                with YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(query, download=False)
-                    thumbnail = info.get("thumbnail")
-            except Exception as e:
-                output.append({"Title": f"Error: {e}", "IcoPath": "Images/app.png"})
-                return output
-            
+            ydl = CustomYoutubeDL(params=ydl_opts)
+
+            info = ydl.extract_info(query)
+            if ydl.error_message:
+                output.append(
+                    {
+                        "Title": "Something went wrong!",
+                        "SubTitle": ydl.error_message,
+                        "IcoPath": "Images/app.png",
+                    }
+                )
+            else:
+                thumbnail = info.get("thumbnail")
 
             for format in reversed(info["formats"]):
                 if format["resolution"] is not None and format["tbr"] is not None:
