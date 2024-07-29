@@ -14,6 +14,7 @@ from flowlauncher import FlowLauncher
 from yt_dlp import YoutubeDL, DownloadError
 
 
+# Custom YoutubeDL class to exception handling
 class CustomYoutubeDL(YoutubeDL):
     def __init__(self, params=None, auto_init=True):
         super().__init__(params, auto_init)
@@ -43,6 +44,7 @@ class CustomYoutubeDL(YoutubeDL):
 
 class AnyVideo(FlowLauncher):
 
+    # Check if the input is a valid URL
     def isValidURL(self, url):
         regex = (
             "((http|https)://)(www.)?"
@@ -54,10 +56,7 @@ class AnyVideo(FlowLauncher):
 
         p = re.compile(regex)
 
-        if re.search(p, url):
-            return True
-        else:
-            return False
+        return re.match(p, url)
 
     def query(self, query):
         output = []
@@ -73,42 +72,43 @@ class AnyVideo(FlowLauncher):
 
         # Temporary fix for "This request has been blocked due to its TLS fingerprint" when using https for some sites.
         if query.startswith("https://"):
-            query.replace("https://", "http://")
+            query = query.replace("https://", "http://")
 
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "format-sort": "res,tbr",
+        }
+
+        ydl = CustomYoutubeDL(params=ydl_opts)
+
+        info = ydl.extract_info(query)
+        if ydl.error_message:
+            output.append(
+                {
+                    "Title": "Something went wrong!",
+                    "SubTitle": ydl.error_message,
+                    "IcoPath": "Images/app.png",
+                }
+            )
+            
+            return output
         else:
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
-                "format-sort": "res,tbr",
-            }
+            thumbnail = info.get("thumbnail")
 
-            ydl = CustomYoutubeDL(params=ydl_opts)
-
-            info = ydl.extract_info(query)
-            if ydl.error_message:
+        for format in reversed(info["formats"]):
+            if format["resolution"] is not None and format["tbr"] is not None:
                 output.append(
                     {
-                        "Title": "Something went wrong!",
-                        "SubTitle": ydl.error_message,
-                        "IcoPath": "Images/app.png",
+                        "Title": info["title"],
+                        "SubTitle": f"Resolution: {format['resolution']}    Bitrate: {format['tbr']}",
+                        "IcoPath": thumbnail if thumbnail else "Images/app.png",
+                        "JsonRPCAction": {
+                            "method": "download",
+                            "parameters": [query, f"{format['format_id']}"],
+                        },
                     }
                 )
-            else:
-                thumbnail = info.get("thumbnail")
-
-            for format in reversed(info["formats"]):
-                if format["resolution"] is not None and format["tbr"] is not None:
-                    output.append(
-                        {
-                            "Title": info["title"],
-                            "SubTitle": f"Resolution: {format['resolution']}    Bitrate: {format['tbr']}",
-                            "IcoPath": thumbnail if thumbnail else "Images/app.png",
-                            "JsonRPCAction": {
-                                "method": "download",
-                                "parameters": [query, f"{format['format_id']}"],
-                            },
-                        }
-                    )
 
         return output
 
