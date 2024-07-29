@@ -91,17 +91,23 @@ class AnyVideo(FlowLauncher):
                     "IcoPath": "Images/app.png",
                 }
             )
-            
+
             return output
         else:
             thumbnail = info.get("thumbnail")
 
         for format in reversed(info["formats"]):
             if format["resolution"] is not None and format["tbr"] is not None:
+                subtitle = (
+                    f"Res: {format['resolution']} • Bitrate: {round(format['tbr'])} kbps"
+                )
+                if "fps" in format and format["fps"] is not None:
+                    subtitle += f" • FPS: {format['fps']}"
+
                 output.append(
                     {
                         "Title": info["title"],
-                        "SubTitle": f"Resolution: {format['resolution']}    Bitrate: {format['tbr']}",
+                        "SubTitle": subtitle,
                         "IcoPath": thumbnail if thumbnail else "Images/app.png",
                         "JsonRPCAction": {
                             "method": "download",
@@ -113,7 +119,7 @@ class AnyVideo(FlowLauncher):
         return output
 
     def download(self, url, format_id):
-        command = f"yt-dlp -f {format_id} {url} -P ~/Downloads/AnyDownloader --windows-filenames --quiet --progress --no-mtime --force-overwrites --no-part"
+        command = f"yt-dlp -f {format_id}+ba {url} -P ~/Downloads/AnyDownloader --windows-filenames --quiet --progress --no-mtime --force-overwrites --no-part"
         os.system(command)
 
 
