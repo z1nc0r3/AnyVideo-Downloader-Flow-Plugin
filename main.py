@@ -11,7 +11,7 @@ sys.path.append(os.path.join(parent_folder_path, "lib"))
 sys.path.append(os.path.join(parent_folder_path, "plugin"))
 
 from flowlauncher import FlowLauncher
-from yt_dlp import YoutubeDL, DownloadError
+from yt_dlp import YoutubeDL
 
 
 # Custom YoutubeDL class to exception handling
@@ -59,14 +59,14 @@ class AnyVideo(FlowLauncher):
         return re.match(p, url)
 
     def query(self, query):
-        output = []
         if len(query.strip()) == 0:
-            output.append({"Title": "Enter a video URL", "IcoPath": "Images/app.png"})
-            return output
+            return [{"Title": "Please input the URL of the video,", "IcoPath": "Images/app.png"}]
+
+        output = []
 
         if not self.isValidURL(query):
             output.append(
-                {"Title": "Please enter a valid URL", "IcoPath": "Images/app.png"}
+                {"Title": "Please check the URL for errors.", "IcoPath": "Images/error.png"}
             )
             return output
 
@@ -87,8 +87,8 @@ class AnyVideo(FlowLauncher):
             output.append(
                 {
                     "Title": "Something went wrong!",
-                    "SubTitle": ydl.error_message,
-                    "IcoPath": "Images/app.png",
+                    "SubTitle": "Couldn't extract video information. Please check the URL.",
+                    "IcoPath": "Images/error.png",
                 }
             )
 
@@ -98,9 +98,7 @@ class AnyVideo(FlowLauncher):
 
         for format in reversed(info["formats"]):
             if format["resolution"] is not None and format["tbr"] is not None:
-                subtitle = (
-                    f"Res: {format['resolution']} • Bitrate: {round(format['tbr'])} kbps"
-                )
+                subtitle = f"Res: {format['resolution']} • Bitrate: {round(format['tbr'])} kbps"
                 if "fps" in format and format["fps"] is not None:
                     subtitle += f" • FPS: {format['fps']}"
 
@@ -108,7 +106,7 @@ class AnyVideo(FlowLauncher):
                     {
                         "Title": info["title"],
                         "SubTitle": subtitle,
-                        "IcoPath": thumbnail if thumbnail else "Images/app.png",
+                        "IcoPath": thumbnail if thumbnail else "Images/video.png",
                         "JsonRPCAction": {
                             "method": "download",
                             "parameters": [query, f"{format['format_id']}"],
