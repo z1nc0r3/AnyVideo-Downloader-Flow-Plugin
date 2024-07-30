@@ -1,3 +1,2 @@
 flowlauncher
-yt-dlp[default]
-pycryptodomex
+yt-dlp
