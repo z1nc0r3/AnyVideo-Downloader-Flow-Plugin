@@ -1,2 +1,2 @@
 flowlauncher
-yt-dlp[default]
+yt-dlp
