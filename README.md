@@ -7,6 +7,8 @@
 ### ⚡Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) module. Thank you for this amazing program!
 ![GitHub Release](https://img.shields.io/github/v/release/z1nc0r3/AnyVideo-Downloader-Flow-Plugin) ![GitHub Release Date](https://img.shields.io/github/release-date/z1nc0r3/AnyVideo-Downloader-Flow-Plugin) ![](https://img.shields.io/github/downloads/z1nc0r3/AnyVideo-Downloader-Flow-Plugin/total)
 
+<a href="https://www.buymeacoffee.com/z1nc0r3" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
 ![JDpcNosMet](https://github.com/user-attachments/assets/5049273d-72f9-4d7b-86cb-1a924b0f5b21)
 
 
