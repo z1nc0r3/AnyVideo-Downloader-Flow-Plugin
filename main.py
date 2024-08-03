@@ -4,8 +4,6 @@
 # Date: 2024-07-28
 
 import sys, os, re
-import requests
-from datetime import datetime, timedelta
 
 parent_folder_path = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(parent_folder_path)
@@ -15,16 +13,12 @@ sys.path.append(os.path.join(parent_folder_path, "plugin"))
 from flowlauncher import FlowLauncher
 from yt_dlp import YoutubeDL
 
-DOWNLOAD_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-DOWNLOAD_PATH = os.path.join(parent_folder_path, "yt-dlp.exe")
-LAST_DOWNLOAD_FILE = os.path.join(parent_folder_path, "last_download.txt")
+from datetime import datetime, timedelta
 CHECK_INTERVAL_DAYS = 3
-
+LAST_DOWNLOAD_FILE = os.path.join(parent_folder_path, "last_download.txt")
 
 def download_yt_dlp():
-    response = requests.get(DOWNLOAD_URL)
-    with open(DOWNLOAD_PATH, "wb") as file:
-        file.write(response.content)
+    os.system("yt-dlp --update")
 
 
 def check_and_download_yt_dlp():
