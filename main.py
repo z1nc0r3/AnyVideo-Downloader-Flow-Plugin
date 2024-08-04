@@ -4,6 +4,7 @@
 # Date: 2024-07-28
 
 import sys, os, re
+from datetime import datetime, timedelta
 
 parent_folder_path = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(parent_folder_path)
@@ -12,6 +13,9 @@ sys.path.append(os.path.join(parent_folder_path, "plugin"))
 
 from flowlauncher import FlowLauncher
 from yt_dlp import YoutubeDL
+
+DOWNLOAD_PATH = os.path.join(parent_folder_path, "yt-dlp.exe")
+CHECK_INTERVAL_DAYS = 10
 
 
 # Custom YoutubeDL class to exception handling
@@ -125,7 +129,13 @@ class AnyVideo(FlowLauncher):
         return output
 
     def download(self, url, format_id):
-        command = f"yt-dlp -f {format_id}+ba {url} -P ~/Downloads/AnyDownloader --windows-filenames --quiet --progress --no-mtime --force-overwrites --no-part"
+        # Check if yt-dlp.exe needs to be updated
+        last_modified_time = datetime.fromtimestamp(os.path.getmtime(DOWNLOAD_PATH))
+        if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS):
+            command = f"yt-dlp -f {format_id}+ba {url} -P ~/Downloads/AnyDownloader -U --windows-filenames --quiet --progress --no-mtime --force-overwrites --no-part"
+        else:
+            command = f"yt-dlp -f {format_id}+ba {url} -P ~/Downloads/AnyDownloader --windows-filenames --quiet --progress --no-mtime --force-overwrites --no-part"
+
         os.system(command)
 
 
