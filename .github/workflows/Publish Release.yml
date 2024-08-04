@@ -2,13 +2,13 @@ name: Publish Release
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths-ignore: 
-      - .github/workflows/*
+  pull_request:
+    types: [closed]
+    branches: [main]
 
 jobs:
   publish:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
     runs-on: windows-latest
     env:
       python_ver: 3.11
