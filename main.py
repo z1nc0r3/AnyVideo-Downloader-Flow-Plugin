@@ -131,7 +131,7 @@ class AnyVideo(FlowLauncher):
     def download(self, url, format_id):
         # Check if yt-dlp.exe needs to be updated
         last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
-        base_command = f'yt-dlp "{url}" -f {format_id}+ba -P ~/Downloads/AnyDownloader --windows-filenames --quiet --progress --no-mtime --force-overwrites --no-part'
+        base_command = f'yt-dlp "{url}" -f {format_id}+ba -P ~/Downloads/AnyDownloader --windows-filenames --restrict-filenames --trim-filenames 50 --quiet --progress --no-mtime --force-overwrites --no-part'
 
         # Check if the yt-dlp.exe needs to be updated
         if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS):
