@@ -110,9 +110,11 @@ class AnyVideo(FlowLauncher):
 
         for format in reversed(info["formats"]):
             if format["resolution"] is not None and format["tbr"] is not None:
-                subtitle = f"Res: {format['resolution']} • Bitrate: {round(format['tbr'])} kbps"
+                subtitle = f"Res: {format['resolution']} ({round(format['tbr'])} kbps)"
+                if "ext" in format and format["ext"] is not None:
+                    subtitle += f" ┃ Format: {format['ext']}"
                 if "fps" in format and format["fps"] is not None:
-                    subtitle += f" • FPS: {format['fps']}"
+                    subtitle += f" ┃ FPS: {format['fps']}"
 
                 output.append(
                     {
