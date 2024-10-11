@@ -1,4 +1,4 @@
-# AnyVideo Downloader 🔻
+# AnyVideo Downloader v1.1.1 🔻
 
 
 ![](https://github.com/user-attachments/assets/18a6cff4-ee86-4322-a72d-c6a02628503a)
@@ -27,6 +27,6 @@
 
 
 ## Upcoming features 💚
-- Custom Download location
-- Adding Download parameter configurations
-- Authentication handler for certain sites
+-[] Custom Download location
+-[] Adding Download parameter configurations
+-[] Exclude file formats from the result list
