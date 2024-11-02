@@ -8,5 +8,5 @@
     "Language": "python",
     "Website": "https://github.com/z1nc0r3/AnyVideo-Downloader-Flow-Plugin",
     "IcoPath": "Images\\app.png",
-    "ExecuteFileName": "main.py"
+    "ExecuteFileName": "run.py"
 }
