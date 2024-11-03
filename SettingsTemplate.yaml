@@ -1,0 +1,6 @@
+body:
+  - type: input
+    attributes:
+      name: download_path
+      label: 'Download path:'
+      defaultValue: "%USERPROFILE%\\Downloads"

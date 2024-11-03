@@ -5,7 +5,6 @@
 
 import os
 import re
-import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -20,10 +19,9 @@ from results import (
 )
 from ytdlp import CustomYoutubeDL
 
-parent_folder_path = os.path.abspath(os.path.dirname(__file__))
-EXE_PATH = os.path.join(parent_folder_path, "yt-dlp.exe")
+EXE_PATH = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 10
-download_path = str(Path.home()) + "\\Downloads"
+DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 
 plugin = Plugin()
 
@@ -37,23 +35,22 @@ def is_valid_url(url: str) -> bool:
         + "._\\+~#?&//=]*)"
     )
 
-    p = re.compile(regex)
-
-    return re.match(p, url)
+    return bool(re.match(regex, url))
 
 
 @plugin.on_method
 def query(query: str) -> ResultResponse:
-    download_path = settings().get("download_path", str(Path.home()) + "\\Downloads")
+    download_path = settings().get("download_path") or DEFAULT_DOWNLOAD_PATH
+    if not os.path.exists(download_path):
+        download_path = DEFAULT_DOWNLOAD_PATH
 
     if not query.strip():
-        return send_results([init_results()])
+        return send_results([init_results(download_path)])
 
     if not is_valid_url(query):
         return send_results([invalid_result()])
 
-    if query.startswith("https://"):
-        query = query.replace("https://", "http://")
+    query = query.replace("https://", "http://")
 
     ydl_opts = {
         "quiet": True,
@@ -75,13 +72,14 @@ def query(query: str) -> ResultResponse:
     if not formats:
         return send_results([empty_result()])
 
-    results = [query_result(query, info, format) for format in reversed(formats)]
-
+    results = [
+        query_result(query, info, format, download_path) for format in reversed(formats)
+    ]
     return send_results(results)
 
 
 @plugin.on_method
-def download(url: str, format_id: str) -> None:
+def download(url: str, format_id: str, download_path: str) -> None:
     last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
 
     base_command = f'yt-dlp "{url}" -f {format_id}+ba -P {download_path} --windows-filenames --restrict-filenames --trim-filenames 50 --quiet --progress --no-mtime --force-overwrites --no-part'

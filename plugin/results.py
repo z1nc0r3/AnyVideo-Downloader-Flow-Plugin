@@ -1,8 +1,12 @@
 from pyflowlauncher import Result
 
 
-def init_results() -> Result:
-    return Result(Title="Please input the URL of the video", IcoPath="Images/app.png")
+def init_results(download_path) -> Result:
+    return Result(
+        Title="Please input the video URL",
+        SubTitle=f"Download path: {download_path}",
+        IcoPath="Images/app.png",
+    )
 
 
 def invalid_result() -> Result:
@@ -21,13 +25,13 @@ def empty_result() -> Result:
     return Result(Title="Couldn't find any video formats.", IcoPath="Images/error.png")
 
 
-def query_result(query, info, format) -> Result:
+def query_result(query, info, format, download_path) -> Result:
     return Result(
         Title=info["title"],
         SubTitle=f"{format['resolution']} ({round(format['tbr'])} kbps) {'┃ Format: ' + str(format['ext']) if format.get('ext') else ''} {'┃ FPS: ' + str(format['fps']) if format.get('fps') else ''}",
         IcoPath=info.get("thumbnail") or "Images/app.png",
         JsonRPCAction={
             "method": "download",
-            "parameters": [query, f"{format['format_id']}"],
+            "parameters": [query, f"{format['format_id']}", download_path],
         },
     )
