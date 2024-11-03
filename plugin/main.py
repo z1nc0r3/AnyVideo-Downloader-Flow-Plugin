@@ -7,8 +7,9 @@ import os
 import re
 import shutil
 from datetime import datetime, timedelta
+from pathlib import Path
 
-from pyflowlauncher import Plugin, Result, ResultResponse, send_results
+from pyflowlauncher import Plugin, ResultResponse, send_results
 from pyflowlauncher.settings import settings
 from results import (
     init_results,
@@ -17,41 +18,14 @@ from results import (
     empty_result,
     query_result,
 )
-from yt_dlp import YoutubeDL
+from ytdlp import CustomYoutubeDL
 
 parent_folder_path = os.path.abspath(os.path.dirname(__file__))
 EXE_PATH = os.path.join(parent_folder_path, "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 10
+download_path = str(Path.home()) + "\\Downloads"
 
 plugin = Plugin()
-
-
-# Custom YoutubeDL class to exception handling
-class CustomYoutubeDL(YoutubeDL):
-    def __init__(self, params=None, auto_init=True):
-        super().__init__(params, auto_init)
-        self.error_message = None
-
-    def report_error(self, message, *args, **kwargs):
-        self.error_message = message
-
-    def extract_info(
-        self,
-        url,
-        download=False,
-        ie_key=None,
-        extra_info=None,
-        process=True,
-        force_generic_extractor=False,
-    ):
-        try:
-            result = super().extract_info(
-                url, download, ie_key, extra_info, process, force_generic_extractor
-            )
-            return result
-        except Exception as e:
-            self.error_message = f"Unexpected error: {str(e)}"
-            return None
 
 
 def is_valid_url(url: str) -> bool:
@@ -70,6 +44,8 @@ def is_valid_url(url: str) -> bool:
 
 @plugin.on_method
 def query(query: str) -> ResultResponse:
+    download_path = settings().get("download_path", str(Path.home()) + "\\Downloads")
+
     if not query.strip():
         return send_results([init_results()])
 
@@ -99,7 +75,7 @@ def query(query: str) -> ResultResponse:
     if not formats:
         return send_results([empty_result()])
 
-    results = [query_result(info, format, download) for format in reversed(formats)]
+    results = [query_result(query, info, format) for format in reversed(formats)]
 
     return send_results(results)
 
@@ -107,12 +83,15 @@ def query(query: str) -> ResultResponse:
 @plugin.on_method
 def download(url: str, format_id: str) -> None:
     last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
-    base_command = f'yt-dlp "{url}" -f {format_id}+ba -P ~/Downloads/AnyDownloader --windows-filenames --restrict-filenames --trim-filenames 50 --quiet --progress --no-mtime --force-overwrites --no-part'
+
+    base_command = f'yt-dlp "{url}" -f {format_id}+ba -P {download_path} --windows-filenames --restrict-filenames --trim-filenames 50 --quiet --progress --no-mtime --force-overwrites --no-part'
+
     command = (
         f"{base_command} -U"
         if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS)
         else base_command
     )
+
     os.system(command)
 
 
