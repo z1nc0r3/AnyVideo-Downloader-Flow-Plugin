@@ -80,8 +80,8 @@ def sort_by_size(formats):
     return sorted(
         formats,
         key=lambda x: (
-            x["size"] is None,
-            -x["size"] if x["size"] is not None else float("-inf"),
+            x["filesize"] is None,
+            -x["filesize"] if x["filesize"] is not None else float("-inf"),
         ),
     )
 
@@ -112,6 +112,7 @@ def query(query: str) -> ResultResponse:
         {
             "format_id": format["format_id"],
             "resolution": format.get("resolution"),
+            "filesize": format.get("filesize"),
             "tbr": format.get("tbr"),
             "fps": format.get("fps"),
         }
@@ -121,6 +122,15 @@ def query(query: str) -> ResultResponse:
 
     if not formats:
         return send_results([empty_result()])
+
+    if sort == "Resolution":
+        formats = sort_by_resolution(formats)
+    elif sort == "File Size":
+        formats = sort_by_size(formats)
+    elif sort == "Total Bit Rate":
+        formats = sort_by_tbr(formats)
+    elif sort == "FPS":
+        formats = sort_by_fps(formats)
 
     results = [
         query_result(
@@ -132,7 +142,7 @@ def query(query: str) -> ResultResponse:
             pvf,
             paf,
         )
-        for format in reversed(formats)
+        for format in formats
     ]
     return send_results(results)
 
@@ -148,19 +158,19 @@ def download(
 ) -> None:
     last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
 
-    base_command = f'yt-dlp "{url}" -f {format_id}+ba -P {download_path} --windows-filenames --restrict-filenames --trim-filenames 50 --quiet --progress --no-mtime --force-overwrites --no-part'
-
-    command = (
-        f"{base_command} -U"
-        if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS)
-        else base_command
-    )
-
-    command = (
-        f"{command} -x --audio-quality 0 --audio-format {pref_audio_path}"
+    format = (
+        f"-f ba -x --audio-format {pref_audio_path}"
         if is_audio
-        else f"{command} --remux-video {pref_video_path}"
+        else f"-f {format_id}+ba --remux-video {pref_video_path}"
     )
+
+    update = (
+        f"-U"
+        if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS)
+        else ""
+    )
+
+    command = f'yt-dlp "{url}" {format} -P {download_path} --windows-filenames --restrict-filenames --trim-filenames 50 --quiet --progress --no-mtime --force-overwrites --no-part {update}'
 
     os.system(command)
 
