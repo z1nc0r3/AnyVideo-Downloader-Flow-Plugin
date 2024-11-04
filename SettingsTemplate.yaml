@@ -14,7 +14,7 @@ body:
           options:
               - Resolution
               - File Size
-              - Total Bit Rate
+              - Total Bitrate
               - FPS
     - type: dropdown
       attributes:
