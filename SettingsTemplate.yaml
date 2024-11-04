@@ -1,6 +1,42 @@
 body:
-  - type: input
-    attributes:
-      name: download_path
-      label: 'Download path:'
-      defaultValue: "%USERPROFILE%\\Downloads"
+    - type: input
+      attributes:
+          name: download_path
+          label: "Download path:"
+          description: "Enter the path where you want to save the downloaded files."
+          defaultValue: "%USERPROFILE%\\Downloads"
+    - type: dropdown
+      attributes:
+          name: sorting_order
+          label: "Sorting order:"
+          defaultValue: "Resolution"
+          description: "Select the sorting order for the results."
+          options:
+              - Resolution
+              - File Size
+              - Total Bit Rate
+              - FPS
+    - type: dropdown
+      attributes:
+          name: preferred_video_format
+          label: "Preferred Video format:"
+          defaultValue: "mp4"
+          description: "Select the preferred video format for downloading videos."
+          options:
+              - mp4
+              - mkv
+              - avi
+              - flv
+              - webm
+    - type: dropdown
+      attributes:
+          name: preferred_audio_format
+          label: "Preferred Audio format:"
+          defaultValue: "mp3"
+          description: "Select the preferred audio format for downloading audio."
+          options:
+              - mp3
+              - m4a
+              - wav
+              - flac
+            
