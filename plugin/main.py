@@ -181,7 +181,7 @@ def query(query: str) -> ResultResponse:
         formats = sort_by_resolution(formats)
     elif sort == "File Size":
         formats = sort_by_size(formats)
-    elif sort == "Total Bit Rate":
+    elif sort == "Total Bitrate":
         formats = sort_by_tbr(formats)
     elif sort == "FPS":
         formats = sort_by_fps(formats)

@@ -1,4 +1,4 @@
-# AnyVideo Downloader v1.1.1 🔻
+# AnyVideo Downloader v2.0.0 🔻
 
 
 ![](https://github.com/user-attachments/assets/18a6cff4-ee86-4322-a72d-c6a02628503a)
@@ -14,8 +14,15 @@
 
 ## Features 🪄
 - Supports 1000+ websites
-- Video quality selector
+- Download videos in various formats
 - Audio-only support
+- Custom download location
+- Preferred video/audio format selection
+- Custom sorting of the result list
+  - Sort by **Resolution**_(default)_
+  - Sort by **File size** _(NB: The file size won't be available for some videos)_
+  - Sort by **Total bitrate**
+  - Sort by **FPS** _(NB: The FPS won't be available for some videos)_
 
 
 ## Usage 👤
@@ -27,6 +34,4 @@
 
 
 ## Upcoming features 💚
--[] Custom Download location
--[] Adding Download parameter configurations
--[] Exclude file formats from the result list
+-[] Simple mode for quick downloads - This will allow users to download video/audio with the best quality available without any additional settings
