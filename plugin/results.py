@@ -25,13 +25,13 @@ def empty_result() -> Result:
     return Result(Title="Couldn't find any video formats.", IcoPath="Images/error.png")
 
 
-def query_result(query, info, format, download_path) -> Result:
+def query_result(query, thumbnail, title, format, download_path, pref_video_path, pref_audio_path) -> Result:
     return Result(
-        Title=info["title"],
-        SubTitle=f"{format['resolution']} ({round(format['tbr'])} kbps) {'┃ Format: ' + str(format['ext']) if format.get('ext') else ''} {'┃ FPS: ' + str(format['fps']) if format.get('fps') else ''}",
-        IcoPath=info.get("thumbnail") or "Images/app.png",
+        Title=title,
+        SubTitle=f"{format['resolution']} ({round(format['tbr'])} kbps) {'┃ Size: ' + str(format['filesize']) if format.get('filesize') else ''} {'┃ FPS: ' + str(format['fps']) if format.get('fps') else ''}",
+        IcoPath=thumbnail or "Images/app.png",
         JsonRPCAction={
             "method": "download",
-            "parameters": [query, f"{format['format_id']}", download_path],
+            "parameters": [query, f"{format['format_id']}", download_path, pref_video_path, pref_audio_path, format['resolution'] == 'audio only'],
         },
     )
