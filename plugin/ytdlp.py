@@ -1,7 +1,6 @@
 from yt_dlp import YoutubeDL
 
-
-# Custom YoutubeDL class to exception handling
+""" CustomYoutubeDL class for better error handling """
 class CustomYoutubeDL(YoutubeDL):
     def __init__(self, params=None, auto_init=True):
         super().__init__(params, auto_init)

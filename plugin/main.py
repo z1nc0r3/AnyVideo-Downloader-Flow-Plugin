@@ -7,6 +7,7 @@ import os
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Tuple
 
 from pyflowlauncher import Plugin, ResultResponse, send_results
 from pyflowlauncher.settings import settings
@@ -22,36 +23,68 @@ from ytdlp import CustomYoutubeDL
 EXE_PATH = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 10
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
+URL_REGEX = (
+    "((http|https)://)(www.)?"
+    + "[a-zA-Z0-9@:%._\\+~#?&//=]"
+    + "{1,256}\\.[a-z]"
+    + "{2,6}\\b([-a-zA-Z0-9@:%"
+    + "._\\+~#?&//=]*)"
+)
 
 plugin = Plugin()
 
 
 def is_valid_url(url: str) -> bool:
-    regex = (
-        "((http|https)://)(www.)?"
-        + "[a-zA-Z0-9@:%._\\+~#?&//=]"
-        + "{1,256}\\.[a-z]"
-        + "{2,6}\\b([-a-zA-Z0-9@:%"
-        + "._\\+~#?&//=]*)"
-    )
+    """
+    Check if the given URL is valid based on a predefined regex pattern.
 
-    return bool(re.match(regex, url))
+    Args:
+        url (str): The URL string to validate.
+
+    Returns:
+        bool: True if the URL matches the regex pattern, False otherwise.
+    """
+
+    return bool(re.match(URL_REGEX, url))
 
 
-def fetch_settings():
-    download_path = settings().get("download_path") or DEFAULT_DOWNLOAD_PATH
-    if not os.path.exists(download_path):
+def fetch_settings() -> Tuple[str, str, str, str]:
+    """
+    Fetches the user settings for the plugin.
+
+    Returns:
+        Tuple[str, str, str, str]: A tuple containing:
+            - download_path (str): The path where videos will be downloaded.
+            - sorting_order (str): The order in which videos will be sorted (default is "Resolution").
+            - pref_video_format (str): The preferred video format (default is "mp4").
+            - pref_audio_format (str): The preferred audio format (default is "mp3").
+    """
+    try:
+        download_path = settings().get("download_path") or DEFAULT_DOWNLOAD_PATH
+        if not os.path.exists(download_path):
+            download_path = DEFAULT_DOWNLOAD_PATH
+
+        sorting_order = settings().get("sorting_order") or "Resolution"
+        pref_video_format = settings().get("preferred_video_format") or "mp4"
+        pref_audio_format = settings().get("preferred_audio_format") or "mp3"
+    except Exception as _:
         download_path = DEFAULT_DOWNLOAD_PATH
-
-    sorting_order = settings().get("sorting_order") or "Resolution"
-
-    pref_video_format = settings().get("preferred_video_format") or "mp4"
-    pref_audio_format = settings().get("preferred_audio_format") or "mp3"
+        sorting_order = "Resolution"
+        pref_video_format = "mp4"
+        pref_audio_format = "mp3"
 
     return download_path, sorting_order, pref_video_format, pref_audio_format
 
 
 def sort_by_resolution(formats):
+    """
+    Sorts a list of video formats by their resolution in descending order.
+
+    Returns:
+        list of dict: The list of video formats sorted by resolution in descending order.
+                      Audio-only formats are considered to have the lowest resolution.
+    """
+
     def resolution_to_tuple(resolution):
         if resolution == "audio only":
             return (0, 0)
@@ -63,10 +96,23 @@ def sort_by_resolution(formats):
 
 
 def sort_by_tbr(formats):
+    """
+    Sort a list of video formats by their 'tbr' (total bitrate) in descending order.
+
+    Returns:
+        list: The input list sorted by the 'tbr' value in descending order.
+    """
     return sorted(formats, key=lambda x: x["tbr"], reverse=True)
 
 
 def sort_by_fps(formats):
+    """
+    Sort a list of video formats by frames per second (fps) in descending order.
+
+    Returns:
+        list of dict: The list of video formats sorted by fps in descending order.
+                      Formats with None fps values are placed at the end.
+    """
     return sorted(
         formats,
         key=lambda x: (
@@ -77,6 +123,14 @@ def sort_by_fps(formats):
 
 
 def sort_by_size(formats):
+    """
+    Sort a list of video formats by their file size in descending order.
+
+    Returns:
+        list of dict: The list of video formats sorted by file size in
+                      descending order. Formats with no file size information
+                      (None) are placed at the end of the list.
+    """
     return sorted(
         formats,
         key=lambda x: (
