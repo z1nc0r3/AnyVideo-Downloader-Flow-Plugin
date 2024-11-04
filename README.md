@@ -34,4 +34,4 @@
 
 
 ## Upcoming features 💚
--[] Simple mode for quick downloads - This will allow users to download video/audio with the best quality available without any additional settings
+- [ ]  Simple mode for quick downloads - This will allow users to download video/audio with the best quality available without any additional settings
