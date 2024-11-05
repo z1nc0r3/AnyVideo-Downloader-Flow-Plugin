@@ -5,7 +5,7 @@
 
 ## A Simple yet Powerful [Flow Launcher](https://github.com/Flow-Launcher/Flow.Launcher) plugin for downloading videos from literally thousands of websites.
 ### ⚡Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) module. Thank you for this amazing program!
-![GitHub Release](https://img.shields.io/github/v/release/z1nc0r3/AnyVideo-Downloader-Flow-Plugin) ![GitHub Release Date](https://img.shields.io/github/release-date/z1nc0r3/AnyVideo-Downloader-Flow-Plugin) ![](https://img.shields.io/github/downloads/z1nc0r3/AnyVideo-Downloader-Flow-Plugin/total)
+![GitHub Release](https://img.shields.io/github/v/release/z1nc0r3/AnyVideo-Downloader-Flow-Plugin) ![GitHub Release Date](https://img.shields.io/github/release-date/z1nc0r3/AnyVideo-Downloader-Flow-Plugin) ![](https://img.shields.io/github/downloads/z1nc0r3/AnyVideo-Downloader-Flow-Plugin/total) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/z1nc0r3/AnyVideo-Downloader-Flow-Plugin/latest/total)
 
 <a href="https://www.buymeacoffee.com/z1nc0r3" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
