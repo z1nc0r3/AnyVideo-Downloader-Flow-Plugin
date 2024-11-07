@@ -5,6 +5,7 @@
 
 import os
 import re
+import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Tuple
@@ -226,7 +227,27 @@ def download(
 
     command = f'yt-dlp "{url}" {format} -P {download_path} --windows-filenames --restrict-filenames --trim-filenames 50 --quiet --progress --no-mtime --force-overwrites --no-part {update}'
 
-    os.system(command)
+    exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
+    command = [
+        exe_path,
+        url,
+        *format.split(),
+        "-P",
+        download_path,
+        "--windows-filenames",
+        "--restrict-filenames",
+        "--trim-filenames",
+        "50",
+        "--quiet",
+        "--progress",
+        "--no-mtime",
+        "--force-overwrites",
+        "--no-part",
+        update,
+    ]
+
+    command = [arg for arg in command if arg]
+    subprocess.run(command)
 
 
 if __name__ == "__main__":
