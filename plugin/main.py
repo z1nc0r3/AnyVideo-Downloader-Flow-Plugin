@@ -212,9 +212,10 @@ def download(
     is_audio: bool,
 ) -> None:
     last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
+    exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
 
     format = (
-        f"-f ba -x --audio-format {pref_audio_path}"
+        f"-f ba"
         if is_audio
         else f"-f {format_id}+ba --remux-video {pref_video_path}"
     )
@@ -225,9 +226,6 @@ def download(
         else ""
     )
 
-    command = f'yt-dlp "{url}" {format} -P {download_path} --windows-filenames --restrict-filenames --trim-filenames 50 --quiet --progress --no-mtime --force-overwrites --no-part {update}'
-
-    exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
     command = [
         exe_path,
         url,
