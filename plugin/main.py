@@ -6,6 +6,7 @@
 import os
 import re
 import subprocess
+import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Tuple
@@ -18,11 +19,13 @@ from results import (
     error_result,
     empty_result,
     query_result,
+    download_ffmpeg_result,
 )
 from ytdlp import CustomYoutubeDL
 
-EXE_PATH = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
-CHECK_INTERVAL_DAYS = 10
+PLUGIN_ROOT = os.path.dirname(__file__)
+EXE_PATH = os.path.join(PLUGIN_ROOT, "yt-dlp.exe")
+CHECK_INTERVAL_DAYS = 5
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 URL_REGEX = (
     "((http|https)://)(www.)?"
@@ -47,6 +50,26 @@ def is_valid_url(url: str) -> bool:
     """
 
     return bool(re.match(URL_REGEX, url))
+
+
+def verify_ffmpeg_binaries():
+    ffmpeg_zip = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
+    ffmpeg_path = os.path.join(PLUGIN_ROOT, "ffmpeg.exe")
+    ffprobe_path = os.path.join(PLUGIN_ROOT, "ffprobe.exe")
+    
+    return (not os.path.exists(ffmpeg_path) or not os.path.exists(ffprobe_path)) and not os.path.exists(ffmpeg_zip)
+
+
+def extract_ffmpeg():
+    ffmpeg_zip = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
+    
+    if os.path.exists(ffmpeg_zip):
+        try:
+            with zipfile.ZipFile(ffmpeg_zip, "r") as zip_ref:
+                zip_ref.extractall(os.path.dirname(__file__))
+            os.remove(ffmpeg_zip)
+        except Exception as _:
+            pass
 
 
 def fetch_settings() -> Tuple[str, str, str, str]:
@@ -144,6 +167,9 @@ def sort_by_size(formats):
 @plugin.on_method
 def query(query: str) -> ResultResponse:
     d_path, sort, pvf, paf = fetch_settings()
+    
+    if verify_ffmpeg_binaries():
+        return send_results([download_ffmpeg_result(PLUGIN_ROOT)])
 
     if not query.strip():
         return send_results([init_results(d_path)])
@@ -203,6 +229,15 @@ def query(query: str) -> ResultResponse:
 
 
 @plugin.on_method
+def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
+    BIN_URL = "https://github.com/z1nc0r3/ffmpeg-binaries/blob/main/ffmpeg-bin.zip?raw=true"
+    FFMPEG_ZIP = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
+    command = f'curl -L "{BIN_URL}" -o "{FFMPEG_ZIP}"'
+    
+    subprocess.run(command)
+
+
+@plugin.on_method
 def download(
     url: str,
     format_id: str,
@@ -213,10 +248,10 @@ def download(
 ) -> None:
     last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
     exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
+    ffmpeg_path = os.path.dirname(__file__)
 
     format = (
-        f"-f ba"
-        if is_audio
+        f"-f b -x --audio-format {pref_audio_path} --audio-quality 0" if is_audio 
         else f"-f {format_id}+ba --remux-video {pref_video_path}"
     )
 
@@ -241,10 +276,13 @@ def download(
         "--no-mtime",
         "--force-overwrites",
         "--no-part",
+        "--ffmpeg-location",
+        ffmpeg_path,
         update,
     ]
 
     command = [arg for arg in command if arg]
+
     subprocess.run(command)
 
 
