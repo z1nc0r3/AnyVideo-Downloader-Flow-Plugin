@@ -27,6 +27,7 @@ body:
               - mkv
               - avi
               - flv
+              - mov
               - webm
     - type: dropdown
       attributes:
@@ -39,4 +40,6 @@ body:
               - m4a
               - wav
               - flac
+              - aac
+              - opus
             

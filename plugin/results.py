@@ -12,17 +12,33 @@ def init_results(download_path) -> Result:
 def invalid_result() -> Result:
     return Result(Title="Please check the URL for errors.", IcoPath="Images/error.png")
 
+def ffmpeg_not_found_result() -> Result:
+    return Result(
+        Title="FFmpeg is not installed!",
+        SubTitle="Some features may not work as expected.",
+        IcoPath="Images/error.png",
+    )
+
 
 def error_result() -> Result:
     return Result(
         Title="Something went wrong!",
-        SubTitle="Couldn't extract video information.",
+        SubTitle=f"Couldn't extract video information.",
         IcoPath="Images/error.png",
     )
 
 
 def empty_result() -> Result:
     return Result(Title="Couldn't find any video formats.", IcoPath="Images/error.png")
+
+
+def download_ffmpeg_result(dest_path) -> Result:
+    return Result(
+        Title="FFmpeg is not installed!",
+        SubTitle="Click this to download FFmpeg binaries.",
+        IcoPath="Images/error.png",
+        JsonRPCAction={"method": "download_ffmpeg_binaries", "parameters": [dest_path]},
+    )
 
 
 def query_result(
