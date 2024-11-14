@@ -167,7 +167,7 @@ def download(
     format = (
         f"-f b -x --audio-format {pref_audio_path} --audio-quality 0"
         if is_audio
-        else f"-f {format_id}+ba --remux-video {pref_video_path}"
+        else f"-f {format_id}+ba[ext=mp3]/{format_id}+ba[ext=aac]/{format_id}+ba[ext=m4a]/{format_id}+ba[ext=wav]/{format_id}+ba --remux-video {pref_video_path}"
     )
 
     update = (
