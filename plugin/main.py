@@ -28,7 +28,7 @@ from results import (
     empty_result,
     query_result,
     download_ffmpeg_result,
-    ffmpeg_not_found_result
+    ffmpeg_not_found_result,
 )
 from ytdlp import CustomYoutubeDL
 
@@ -75,6 +75,8 @@ def query(query: str) -> ResultResponse:
 
     if verify_ffmpeg():
         return send_results([download_ffmpeg_result(PLUGIN_ROOT)])
+
+    extract_ffmpeg()
 
     if not query.strip():
         return send_results([init_results(d_path)])
