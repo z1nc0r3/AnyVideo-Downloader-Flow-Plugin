@@ -4,7 +4,7 @@
     "Name": "AnyVideo Downloader",
     "Description": "Plugin for downloading videos from YouTube, Facebook, Twitter, Instagram, and many other websites.",
     "Author": "z1nc0r3",
-    "Version": "2.1.0",
+    "Version": "2.1.1",
     "Language": "python",
     "Website": "https://github.com/z1nc0r3/AnyVideo-Downloader-Flow-Plugin",
     "IcoPath": "Images\\app.png",
