@@ -1,2 +1,2 @@
-pyflowlauncher[all]
+pyflowlauncher
 yt-dlp
