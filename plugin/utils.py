@@ -1,6 +1,7 @@
 import re
 import os
 import zipfile
+import shutil
 
 PLUGIN_ROOT = os.path.dirname(__file__)
 URL_REGEX = (
@@ -99,7 +100,13 @@ def verify_ffmpeg_binaries():
     ffmpeg_path = os.path.join(PLUGIN_ROOT, "ffmpeg.exe")
     ffprobe_path = os.path.join(PLUGIN_ROOT, "ffprobe.exe")
 
-    return not os.path.exists(ffmpeg_path) or not os.path.exists(ffprobe_path)
+    if os.path.exists(ffmpeg_path) and os.path.exists(ffprobe_path):
+        return False
+
+    if shutil.which("ffmpeg") and shutil.which("ffprobe"):
+        return False
+
+    return True
 
 
 def verify_ffmpeg():
