@@ -96,6 +96,9 @@ def query(query: str) -> ResultResponse:
     if ydl.error_message:
         return send_results([error_result()])
 
+    if not formats:
+        return send_results([empty_result()])
+    
     formats = [
         {
             "format_id": format.get("format_id"),
@@ -107,9 +110,6 @@ def query(query: str) -> ResultResponse:
         for format in info.get("formats", [])
         if format.get("resolution") and format.get("tbr")
     ]
-
-    if not formats:
-        return send_results([empty_result()])
 
     if sort == "Resolution":
         formats = sort_by_resolution(formats)
