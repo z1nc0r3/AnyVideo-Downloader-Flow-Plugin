@@ -98,13 +98,13 @@ def query(query: str) -> ResultResponse:
 
     formats = [
         {
-            "format_id": format["format_id"],
+            "format_id": format.get("format_id"),
             "resolution": format.get("resolution"),
             "filesize": format.get("filesize"),
             "tbr": format.get("tbr"),
             "fps": format.get("fps"),
         }
-        for format in info["formats"]
+        for format in info.get("formats", [])
         if format.get("resolution") and format.get("tbr")
     ]
 
