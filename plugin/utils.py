@@ -109,6 +109,13 @@ def verify_ffmpeg_binaries():
     return True
 
 
+def get_binaries_paths():
+    if verify_ffmpeg_binaries():
+        return os.path.dirname(__file__)
+    else:
+        return shutil.which("ffmpeg")
+
+
 def verify_ffmpeg():
     return verify_ffmpeg_zip() and verify_ffmpeg_binaries()
 
