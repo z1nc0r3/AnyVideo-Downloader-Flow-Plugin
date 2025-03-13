@@ -20,6 +20,7 @@ from utils import (
     verify_ffmpeg_binaries,
     verify_ffmpeg,
     extract_ffmpeg,
+    get_binaries_paths,
 )
 from results import (
     init_results,
@@ -95,7 +96,7 @@ def query(query: str) -> ResultResponse:
 
     if ydl.error_message:
         return send_results([error_result()])
-    
+
     formats = [
         {
             "format_id": format.get("format_id"),
@@ -107,7 +108,7 @@ def query(query: str) -> ResultResponse:
         for format in info.get("formats", [])
         if format.get("resolution") and format.get("tbr")
     ]
-    
+
     if not formats:
         return send_results([empty_result()])
 
@@ -121,8 +122,10 @@ def query(query: str) -> ResultResponse:
         formats = sort_by_fps(formats)
 
     results = []
+
     if verify_ffmpeg_binaries():
         results.extend([ffmpeg_not_found_result()])
+
     results.extend(
         [
             query_result(
@@ -162,7 +165,7 @@ def download(
 ) -> None:
     last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
     exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
-    ffmpeg_path = os.path.dirname(__file__)
+    ffmpeg_path = get_binaries_paths()
 
     format = (
         f"-f b -x --audio-format {pref_audio_path} --audio-quality 0"
