@@ -12,9 +12,10 @@ def init_results(download_path) -> Result:
 def invalid_result() -> Result:
     return Result(Title="Please check the URL for errors.", IcoPath="Images/error.png")
 
+
 def ffmpeg_not_found_result() -> Result:
     return Result(
-        Title="FFmpeg is not installed!",
+        Title="FFmpeg binaries not found!",
         SubTitle="Some features may not work as expected.",
         IcoPath="Images/error.png",
     )
@@ -34,7 +35,7 @@ def empty_result() -> Result:
 
 def download_ffmpeg_result(dest_path) -> Result:
     return Result(
-        Title="FFmpeg is not installed!",
+        Title="FFmpeg binaries not found!",
         SubTitle="Click this to download FFmpeg binaries.",
         IcoPath="Images/error.png",
         JsonRPCAction={"method": "download_ffmpeg_binaries", "parameters": [dest_path]},
