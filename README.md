@@ -1,4 +1,4 @@
-# AnyVideo Downloader v2.1.2 🔻
+# AnyVideo Downloader v2.1.3 🔻
 
 
 ![](https://github.com/user-attachments/assets/18a6cff4-ee86-4322-a72d-c6a02628503a)
@@ -28,7 +28,7 @@
 ## Usage 👤
 - Install the **AnyVideo Downloader** plugin ([guide](https://github.com/Flow-Launcher/Flow.Launcher/?tab=readme-ov-file#-plugin-store))
 - Use the command ```vd``` for start the plugin
-- For new installations, you need to download ffmpeg binaries one time. The plugin will show a message and you can download it by clicking the link. New terminal will open and download the binaries. After that, you can use the plugin without any issues.
+- For new installations, you need to download ffmpeg binaries one time (only if your system don't have ffmpeg binaries installed already). The plugin will show a message and you can download it by clicking the link. New terminal will open and download the binaries. After that, you can use the plugin without any issues.
 - Insert the URL of the video you want to download
 - Select the video format you need
 - It'll open a separate terminal which continues the download
