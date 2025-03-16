@@ -33,7 +33,7 @@ from results import (
 )
 from ytdlp import CustomYoutubeDL
 
-PLUGIN_ROOT = os.path.dirname(__file__)
+PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXE_PATH = os.path.join(PLUGIN_ROOT, "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 5
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
@@ -74,7 +74,7 @@ def fetch_settings() -> Tuple[str, str, str, str]:
 def query(query: str) -> ResultResponse:
     d_path, sort, pvf, paf = fetch_settings()
 
-    if verify_ffmpeg():
+    if not verify_ffmpeg():
         return send_results([download_ffmpeg_result(PLUGIN_ROOT)])
 
     extract_ffmpeg()
@@ -123,7 +123,7 @@ def query(query: str) -> ResultResponse:
 
     results = []
 
-    if verify_ffmpeg_binaries():
+    if not verify_ffmpeg_binaries():
         results.extend([ffmpeg_not_found_result()])
 
     results.extend(

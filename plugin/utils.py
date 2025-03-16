@@ -3,7 +3,7 @@ import os
 import zipfile
 import shutil
 
-PLUGIN_ROOT = os.path.dirname(__file__)
+PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 URL_REGEX = (
     "((http|https)://)(www.)?"
     + "[a-zA-Z0-9@:%._\\+~#?&//=]"
@@ -93,7 +93,7 @@ def sort_by_size(formats):
 
 def verify_ffmpeg_zip():
     ffmpeg_zip = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
-    return not os.path.exists(ffmpeg_zip)
+    return os.path.exists(ffmpeg_zip)
 
 
 def verify_ffmpeg_binaries():
@@ -101,12 +101,12 @@ def verify_ffmpeg_binaries():
     ffprobe_path = os.path.join(PLUGIN_ROOT, "ffprobe.exe")
 
     if os.path.exists(ffmpeg_path) and os.path.exists(ffprobe_path):
-        return False
+        return True
 
     if shutil.which("ffmpeg") and shutil.which("ffprobe"):
-        return False
+        return True
 
-    return True
+    return False
 
 
 def get_binaries_paths():
@@ -117,7 +117,7 @@ def get_binaries_paths():
 
 
 def verify_ffmpeg():
-    return verify_ffmpeg_zip() and verify_ffmpeg_binaries()
+    return verify_ffmpeg_zip() or verify_ffmpeg_binaries()
 
 
 def extract_ffmpeg():
