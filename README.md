@@ -1,4 +1,4 @@
-# AnyVideo Downloader v2.1.3 🔻
+# AnyVideo Downloader v2.1.4 🔻
 
 
 ![](https://github.com/user-attachments/assets/18a6cff4-ee86-4322-a72d-c6a02628503a)
