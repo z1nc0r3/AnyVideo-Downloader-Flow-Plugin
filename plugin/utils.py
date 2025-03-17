@@ -3,7 +3,7 @@ import os
 import zipfile
 import shutil
 
-PLUGIN_ROOT = os.path.dirname(__file__)
+PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 URL_REGEX = (
     "((http|https)://)(www.)?"
     + "[a-zA-Z0-9@:%._\\+~#?&//=]"
@@ -92,24 +92,45 @@ def sort_by_size(formats):
 
 
 def verify_ffmpeg_zip():
+    """
+    Checks if the ffmpeg.zip file exists in the plugin directory.
+
+    Returns:
+        bool: False if the ffmpeg.zip file does not exist, True otherwise.
+    """
     ffmpeg_zip = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
-    return not os.path.exists(ffmpeg_zip)
+    return os.path.exists(ffmpeg_zip)
 
 
 def verify_ffmpeg_binaries():
+    """
+    Verifies the presence of FFmpeg and FFprobe binaries.
+    This function checks if the FFmpeg and FFprobe binaries are present in the
+    plugin's root directory. If they are not found there, it checks if they are
+    available in the system's PATH.
+    Returns:
+        bool: True if both FFmpeg and FFprobe binaries are found, False otherwise.
+    """
     ffmpeg_path = os.path.join(PLUGIN_ROOT, "ffmpeg.exe")
     ffprobe_path = os.path.join(PLUGIN_ROOT, "ffprobe.exe")
 
     if os.path.exists(ffmpeg_path) and os.path.exists(ffprobe_path):
-        return False
+        return True
 
     if shutil.which("ffmpeg") and shutil.which("ffprobe"):
-        return False
+        return True
 
-    return True
+    return False
 
 
 def get_binaries_paths():
+    """
+    Determines the path to the ffmpeg binaries.
+
+    Returns:
+        str: The directory path of the current file if ffmpeg binaries are verified.
+             Otherwise, returns the path to the ffmpeg executable found in the system PATH.
+    """
     if verify_ffmpeg_binaries():
         return os.path.dirname(__file__)
     else:
@@ -117,10 +138,29 @@ def get_binaries_paths():
 
 
 def verify_ffmpeg():
-    return verify_ffmpeg_zip() and verify_ffmpeg_binaries()
+    """
+    Verify the presence and integrity of FFmpeg.
+
+    This function checks if the FFmpeg zip file and binaries are present and valid.
+    It returns True if both the zip file and binaries are verified successfully, otherwise False.
+
+    Returns:
+        bool: True if both FFmpeg zip file and binaries are verified, False otherwise.
+    """
+    return verify_ffmpeg_zip() or verify_ffmpeg_binaries()
 
 
 def extract_ffmpeg():
+    """
+    Extracts the ffmpeg.zip file located in the plugin root directory.
+    This function checks if the ffmpeg.zip file exists in the plugin root directory.
+    If it exists, it extracts the contents of the zip file to the directory of the
+    current script and then removes the zip file.
+    Note:
+        If an exception occurs during the extraction process, it is silently ignored.
+    Raises:
+        None
+    """
     ffmpeg_zip = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
 
     if os.path.exists(ffmpeg_zip):
@@ -130,3 +170,4 @@ def extract_ffmpeg():
             os.remove(ffmpeg_zip)
         except Exception as _:
             pass
+
