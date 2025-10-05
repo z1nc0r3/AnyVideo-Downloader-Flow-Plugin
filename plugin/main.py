@@ -38,7 +38,6 @@ EXE_PATH = os.path.join(PLUGIN_ROOT, "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 5
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 
-
 plugin = Plugin()
 
 
@@ -61,7 +60,7 @@ def fetch_settings() -> Tuple[str, str, str, str]:
         sorting_order = settings().get("sorting_order") or "Resolution"
         pref_video_format = settings().get("preferred_video_format") or "mp4"
         pref_audio_format = settings().get("preferred_audio_format") or "mp3"
-    except Exception as _:
+    except Exception:
         download_path = DEFAULT_DOWNLOAD_PATH
         sorting_order = "Resolution"
         pref_video_format = "mp4"
@@ -149,9 +148,17 @@ def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
         "https://github.com/z1nc0r3/ffmpeg-binaries/blob/main/ffmpeg-bin.zip?raw=true"
     )
     FFMPEG_ZIP = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
-    command = f'curl -L "{BIN_URL}" -o "{FFMPEG_ZIP}"'
-
-    subprocess.run(command)
+    try:
+        subprocess.run(
+            ["curl", "-L", BIN_URL, "-o", FFMPEG_ZIP],
+            check=True,
+        )
+    except Exception:
+        # Fallback to shell invocation
+        try:
+            subprocess.run(f'curl -L "{BIN_URL}" -o "{FFMPEG_ZIP}"', shell=True, check=True)
+        except Exception:
+            pass
 
 
 @plugin.on_method
@@ -163,26 +170,42 @@ def download(
     pref_audio_path: str,
     is_audio: bool,
 ) -> None:
-    last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
+    try:
+        last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
+    except Exception:
+        last_modified_time = None
+
     exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
-    ffmpeg_path = get_binaries_paths()
+    ffmpeg_path = get_binaries_paths() or ""
 
-    format = (
-        f"-f b -x --audio-format {pref_audio_path} --audio-quality 0"
-        if is_audio
-        else f"-f {format_id}+ba[ext=mp3]/{format_id}+ba[ext=aac]/{format_id}+ba[ext=m4a]/{format_id}+ba[ext=wav]/{format_id}+ba --remux-video {pref_video_path}"
-    )
+    if is_audio:
+        format_value = "bestaudio/best"
+    else:
+        # If the user selected a specific format_id (e.g. "137"), try:
+        # 1) <format_id>+bestaudio (video+audio merged)
+        # 2) <format_id> (video only) — yt-dlp can later combine with audio if available
+        # 3) bestvideo+bestaudio (best muxed)
+        # 4) best (fallback)
+        requested = str(format_id) if format_id else ""
+        fallback_choices = []
+        if requested:
+            fallback_choices.append(f"{requested}+bestaudio")
+            fallback_choices.append(f"{requested}")
+        fallback_choices.append("bestvideo+bestaudio")
+        fallback_choices.append("best")
+        format_value = "/".join(fallback_choices)
 
-    update = (
-        f"-U"
-        if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS)
-        else ""
-    )
+    command = [exe_path, url, "-f", format_value]
 
-    command = [
-        exe_path,
-        url,
-        *format.split(),
+    if is_audio:
+        command += ["-x", "--audio-format", pref_audio_path or "mp3", "--audio-quality", "0"]
+    else:
+        if pref_video_path:
+            command += ["--remux-video", pref_video_path]
+        else:
+            command += ["--remux-video", "mp4"]
+
+    command += [
         "-P",
         download_path,
         "--windows-filenames",
@@ -194,15 +217,28 @@ def download(
         "--no-mtime",
         "--force-overwrites",
         "--no-part",
-        "--ffmpeg-location",
-        ffmpeg_path,
-        update,
     ]
 
-    command = [arg for arg in command if arg]
+    if ffmpeg_path:
+        command += ["--ffmpeg-location", ffmpeg_path]
 
-    subprocess.run(command)
+    update_flag = ""
+    if last_modified_time is not None:
+        if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS):
+            update_flag = "-U"
+    else:
+        # If we couldn't determine last modified time (exe missing), try updating
+        update_flag = "-U"
 
+    if update_flag:
+        command.append(update_flag)
+
+    command = [arg for arg in command if arg is not None and arg != ""]
+
+    try:
+        subprocess.run(command)
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     plugin.run()
