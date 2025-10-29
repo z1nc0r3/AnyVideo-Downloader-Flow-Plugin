@@ -197,7 +197,6 @@ def download(
     except Exception:
         last_modified_time = None
 
-    exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
     ffmpeg_path = get_binaries_paths() or ""
 
     if is_audio:
@@ -217,17 +216,14 @@ def download(
         fallback_choices.append("best")
         format_value = "/".join(fallback_choices)
 
-    command = [exe_path, url, "-f", format_value]
+    command = [EXE_PATH, url, "-f", format_value]
 
     if is_audio:
-        command += ["-x", "--audio-format", pref_audio_path or "mp3", "--audio-quality", "0"]
+        command.extend(["-x", "--audio-format", pref_audio_path or "mp3", "--audio-quality", "0"])
     else:
-        if pref_video_path:
-            command += ["--remux-video", pref_video_path]
-        else:
-            command += ["--remux-video", "mp4"]
+        command.extend(["--remux-video", pref_video_path or "mp4"])
 
-    command += [
+    command.extend([
         "-P",
         download_path,
         "--windows-filenames",
@@ -239,23 +235,14 @@ def download(
         "--no-mtime",
         "--force-overwrites",
         "--no-part",
-    ]
+    ])
 
     if ffmpeg_path:
-        command += ["--ffmpeg-location", ffmpeg_path]
+        command.extend(["--ffmpeg-location", ffmpeg_path])
 
-    update_flag = ""
-    if last_modified_time is not None:
-        if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS):
-            update_flag = "-U"
-    else:
-        # If we couldn't determine last modified time (exe missing), try updating
-        update_flag = "-U"
-
-    if update_flag:
-        command.append(update_flag)
-
-    command = [arg for arg in command if arg is not None and arg != ""]
+    # Check if update is needed
+    if last_modified_time is None or datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS):
+        command.append("-U")
 
     try:
         subprocess.run(command)
