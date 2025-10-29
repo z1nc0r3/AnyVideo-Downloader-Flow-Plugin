@@ -41,10 +41,15 @@ DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 
 plugin = Plugin()
 
+# Cache for settings to avoid repeated file reads
+_settings_cache = None
+_cache_time = None
+CACHE_DURATION_SECONDS = 30  # Cache settings for 30 seconds
+
 
 def fetch_settings() -> Tuple[str, str, str, str]:
     """
-    Fetches the user settings for the plugin.
+    Fetches the user settings for the plugin with caching to improve performance.
 
     Returns:
         Tuple[str, str, str, str]: A tuple containing:
@@ -53,6 +58,14 @@ def fetch_settings() -> Tuple[str, str, str, str]:
             - pref_video_format (str): The preferred video format (default is "mp4").
             - pref_audio_format (str): The preferred audio format (default is "mp3").
     """
+    global _settings_cache, _cache_time
+    
+    # Check if cache is valid
+    current_time = datetime.now()
+    if _settings_cache is not None and _cache_time is not None:
+        if (current_time - _cache_time).total_seconds() < CACHE_DURATION_SECONDS:
+            return _settings_cache
+    
     try:
         download_path = settings().get("download_path") or DEFAULT_DOWNLOAD_PATH
         if not os.path.exists(download_path):
@@ -67,7 +80,11 @@ def fetch_settings() -> Tuple[str, str, str, str]:
         pref_video_format = "mp4"
         pref_audio_format = "mp3"
 
-    return download_path, sorting_order, pref_video_format, pref_audio_format
+    # Update cache
+    _settings_cache = (download_path, sorting_order, pref_video_format, pref_audio_format)
+    _cache_time = current_time
+    
+    return _settings_cache
 
 
 @plugin.on_method
