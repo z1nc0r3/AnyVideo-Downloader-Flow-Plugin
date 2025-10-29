@@ -240,7 +240,9 @@ def download(
     if ffmpeg_path:
         command.extend(["--ffmpeg-location", ffmpeg_path])
 
-    # Check if update is needed
+    # Check if update is needed:
+    # - When exe is missing (last_modified_time is None)
+    # - When CHECK_INTERVAL_DAYS have passed since last modification
     if last_modified_time is None or datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS):
         command.append("-U")
 
