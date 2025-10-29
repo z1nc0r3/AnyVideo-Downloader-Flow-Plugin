@@ -114,17 +114,20 @@ def query(query: str) -> ResultResponse:
     if ydl.error_message:
         return send_results([error_result()])
 
-    formats = [
-        {
+    formats = []
+    for format in info.get("formats", []):
+        resolution = format.get("resolution")
+        tbr = format.get("tbr")
+        # Skip formats without resolution or tbr
+        if not resolution or not tbr:
+            continue
+        formats.append({
             "format_id": format.get("format_id"),
-            "resolution": format.get("resolution"),
+            "resolution": resolution,
             "filesize": format.get("filesize"),
-            "tbr": format.get("tbr"),
+            "tbr": tbr,
             "fps": format.get("fps"),
-        }
-        for format in info.get("formats", [])
-        if format.get("resolution") and format.get("tbr")
-    ]
+        })
 
     if not formats:
         return send_results([empty_result()])
