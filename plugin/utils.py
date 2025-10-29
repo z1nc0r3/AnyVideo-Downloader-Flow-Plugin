@@ -11,6 +11,8 @@ URL_REGEX = (
     + "{2,6}\\b([-a-zA-Z0-9@:%"
     + "._\\+~#?&//=]*)"
 )
+# Compile regex pattern once for better performance
+URL_PATTERN = re.compile(URL_REGEX)
 
 
 def is_valid_url(url: str) -> bool:
@@ -24,7 +26,7 @@ def is_valid_url(url: str) -> bool:
         bool: True if the URL matches the regex pattern, False otherwise.
     """
 
-    return bool(re.match(URL_REGEX, url))
+    return bool(URL_PATTERN.match(url))
 
 
 def sort_by_resolution(formats):

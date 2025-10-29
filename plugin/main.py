@@ -19,6 +19,7 @@ from utils import (
     sort_by_size,
     verify_ffmpeg_binaries,
     verify_ffmpeg,
+    verify_ffmpeg_zip,
     extract_ffmpeg,
     get_binaries_paths,
 )
@@ -76,15 +77,15 @@ def query(query: str) -> ResultResponse:
     if not verify_ffmpeg():
         return send_results([download_ffmpeg_result(PLUGIN_ROOT)])
 
-    extract_ffmpeg()
+    # Extract ffmpeg only if the zip file exists (not on every query)
+    if verify_ffmpeg_zip():
+        extract_ffmpeg()
 
     if not query.strip():
         return send_results([init_results(d_path)])
 
     if not is_valid_url(query):
         return send_results([invalid_result()])
-
-    query = query.replace("https://", "http://")
 
     ydl_opts = {
         "quiet": True,
@@ -122,6 +123,7 @@ def query(query: str) -> ResultResponse:
 
     results = []
 
+    # Only check binaries if we haven't verified ffmpeg already
     if not verify_ffmpeg_binaries():
         results.extend([ffmpeg_not_found_result()])
 
