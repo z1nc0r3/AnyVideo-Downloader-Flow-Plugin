@@ -249,10 +249,12 @@ def download(
     command += [
         "-P",
         download_path,
+        "--output",
+        "%(title).100s.%(ext)s",
         "--windows-filenames",
         "--restrict-filenames",
         "--trim-filenames",
-        "50",
+        "100",
         "--quiet",
         "--progress",
         "--no-mtime",
