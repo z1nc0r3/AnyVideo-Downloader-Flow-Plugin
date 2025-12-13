@@ -86,3 +86,6 @@ pythonenv*
 # End of https://www.toptal.com/developers/gitignore/api/python,vscode
 
 plugin.log
+plugin/ffmpeg.exe
+plugin/ffprobe.exe
+plugin/yt-dlp.exe
