@@ -166,8 +166,7 @@ def verify_ffmpeg_binaries(return_reason: bool = False):
     """
     Verifies the presence of FFmpeg and FFprobe binaries.
     This function checks if the FFmpeg and FFprobe binaries are present in the
-    plugin's root directory. If they are not found there, it checks if they are
-    available in the system's PATH.
+    plugin's root directory.
     Returns:
         bool | tuple[bool, str | None]: True when binaries are found (and reason when requested).
     """
@@ -191,13 +190,6 @@ def verify_ffmpeg_binaries(return_reason: bool = False):
         result = (True, None)
         return result if return_reason else result[0]
 
-    system_ffmpeg = shutil.which("ffmpeg")
-    system_ffprobe = shutil.which("ffprobe")
-
-    if system_ffmpeg and system_ffprobe:
-        result = (True, None)
-        return result if return_reason else result[0]
-
     reason = " ".join(issues) if issues else "FFmpeg/FFprobe executables are missing or empty."
     result = (False, reason)
     return result if return_reason else result[0]
@@ -208,13 +200,12 @@ def get_binaries_paths():
     Determines the path to the ffmpeg binaries.
 
     Returns:
-        str: The directory path of the current file if ffmpeg binaries are verified.
-             Otherwise, returns the path to the ffmpeg executable found in the system PATH.
+        str: The directory path of the current file if ffmpeg binaries are verified,
+             otherwise None.
     """
     if verify_ffmpeg_binaries():
         return os.path.dirname(__file__)
-    else:
-        return shutil.which("ffmpeg")
+    return None
 
 
 def verify_ffmpeg():
