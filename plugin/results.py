@@ -45,6 +45,14 @@ def download_ffmpeg_result(dest_path, issue=None) -> Result:
     )
 
 
+def ffmpeg_setup_result(issue) -> Result:
+    return Result(
+        Title="FFmpeg setup in progress...",
+        SubTitle=issue or "Please wait a few seconds and try again.",
+        IcoPath="Images/error.png",
+    )
+
+
 def query_result(
     query, thumbnail, title, format, download_path, pref_video_path, pref_audio_path
 ) -> Result:

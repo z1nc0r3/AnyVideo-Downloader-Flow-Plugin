@@ -1,9 +1,9 @@
 import re
 import os
 import zipfile
-import shutil
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
+FFMPEG_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
 URL_REGEX = (
     "((http|https)://)(www.)?"
     + "[a-zA-Z0-9@:%._\\+~#?&//=]"
@@ -219,6 +219,9 @@ def verify_ffmpeg():
     Returns:
         tuple[bool, str | None]: Validation status and reason when invalid.
     """
+    if os.path.exists(FFMPEG_SETUP_LOCK):
+        return False, "Please wait. FFmpeg setup in progress."
+
     binaries_ok, binaries_reason = verify_ffmpeg_binaries(return_reason=True)
     if binaries_ok:
         return True, None
