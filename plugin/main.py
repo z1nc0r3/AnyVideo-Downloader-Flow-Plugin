@@ -19,6 +19,7 @@ from utils import (
     sort_by_size,
     verify_ffmpeg_binaries,
     verify_ffmpeg,
+    verify_ffmpeg_zip,
     extract_ffmpeg,
     get_binaries_paths,
 )
@@ -29,6 +30,7 @@ from results import (
     empty_result,
     query_result,
     download_ffmpeg_result,
+    ffmpeg_setup_result,
     ffmpeg_not_found_result,
 )
 from ytdlp import CustomYoutubeDL
@@ -73,10 +75,15 @@ def fetch_settings() -> Tuple[str, str, str, str]:
 def query(query: str) -> ResultResponse:
     d_path, sort, pvf, paf = fetch_settings()
 
-    if not verify_ffmpeg():
-        return send_results([download_ffmpeg_result(PLUGIN_ROOT)])
+    verified, verify_reason = verify_ffmpeg()
+    if not verified:
+        if verify_reason and "setup in progress" in verify_reason.lower():
+            return send_results([ffmpeg_setup_result(verify_reason)])
+        return send_results([download_ffmpeg_result(PLUGIN_ROOT, verify_reason)])
 
-    extract_ffmpeg()
+    extracted, extract_reason = extract_ffmpeg()
+    if not extracted:
+        return send_results([download_ffmpeg_result(PLUGIN_ROOT, extract_reason)])
 
     if not query.strip():
         return send_results([init_results(d_path)])
@@ -148,15 +155,49 @@ def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
         "https://github.com/z1nc0r3/ffmpeg-binaries/blob/main/ffmpeg-bin.zip?raw=true"
     )
     FFMPEG_ZIP = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
+    lock_path = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
+
+    # Create a lock to indicate setup is in progress so queries can avoid re-triggering.
     try:
-        subprocess.run(
-            ["curl", "-L", BIN_URL, "-o", FFMPEG_ZIP],
-            check=True,
-        )
+        with open(lock_path, "w", encoding="utf-8") as lock_file:
+            lock_file.write("in-progress")
     except Exception:
-        # Fallback to shell invocation
+        pass
+
+    try:
         try:
-            subprocess.run(f'curl -L "{BIN_URL}" -o "{FFMPEG_ZIP}"', shell=True, check=True)
+            subprocess.run(
+                ["curl", "-L", BIN_URL, "-o", FFMPEG_ZIP],
+                check=True,
+            )
+        except Exception:
+            try:
+                subprocess.run(
+                    f'curl -L "{BIN_URL}" -o "{FFMPEG_ZIP}"', shell=True, check=True
+                )
+            except Exception:
+                pass
+
+        if not os.path.exists(FFMPEG_ZIP):
+            return
+
+        zip_ok, zip_reason = verify_ffmpeg_zip(return_reason=True)
+        if not zip_ok:
+            if zip_reason:
+                print(f"FFmpeg download validation failed: {zip_reason}")
+            try:
+                os.remove(FFMPEG_ZIP)
+            except Exception:
+                pass
+            return
+
+        extracted, extract_reason = extract_ffmpeg()
+        if not extracted and extract_reason:
+            print(f"FFmpeg extraction failed: {extract_reason}")
+    finally:
+        try:
+            if os.path.exists(lock_path):
+                os.remove(lock_path)
         except Exception:
             pass
 
@@ -208,10 +249,12 @@ def download(
     command += [
         "-P",
         download_path,
+        "--output",
+        "%(title).100s.%(ext)s",
         "--windows-filenames",
         "--restrict-filenames",
         "--trim-filenames",
-        "50",
+        "100",
         "--quiet",
         "--progress",
         "--no-mtime",

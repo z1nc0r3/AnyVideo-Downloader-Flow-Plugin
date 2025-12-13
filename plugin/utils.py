@@ -1,9 +1,9 @@
 import re
 import os
 import zipfile
-import shutil
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
+FFMPEG_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
 URL_REGEX = (
     "((http|https)://)(www.)?"
     + "[a-zA-Z0-9@:%._\\+~#?&//=]"
@@ -91,36 +91,112 @@ def sort_by_size(formats):
     )
 
 
-def verify_ffmpeg_zip():
+def _is_valid_executable(path: str) -> bool:
     """
-    Checks if the ffmpeg.zip file exists in the plugin directory.
+    Returns True when the given path points to a non-empty executable file.
+    """
+    try:
+        return os.path.isfile(path) and os.path.getsize(path) > 0
+    except OSError:
+        return False
+
+
+def verify_ffmpeg_zip(return_reason: bool = False):
+    """
+    Checks if a valid ffmpeg.zip file exists in the plugin directory.
 
     Returns:
-        bool: False if the ffmpeg.zip file does not exist, True otherwise.
+        Union[bool, Tuple[bool, Optional[str]]]: Validation status (and optional reason when
+        return_reason=True).
     """
     ffmpeg_zip = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
-    return os.path.exists(ffmpeg_zip)
+    if not os.path.exists(ffmpeg_zip):
+        result = (False, "FFmpeg zip is missing.")
+        return result if return_reason else result[0]
+
+    try:
+        if os.path.getsize(ffmpeg_zip) == 0:
+            result = (False, "Downloaded FFmpeg archive is empty.")
+            return result if return_reason else result[0]
+    except OSError:
+        result = (False, "Failed to read FFmpeg archive.")
+        return result if return_reason else result[0]
+
+    try:
+        with zipfile.ZipFile(ffmpeg_zip, "r") as zip_ref:
+            members = zip_ref.namelist()
+            if not members:
+                result = (False, "Downloaded FFmpeg archive is empty.")
+                return result if return_reason else result[0]
+
+            required = ("ffmpeg.exe", "ffprobe.exe")
+            missing = [
+                exe for exe in required if not any(os.path.basename(name) == exe for name in members)
+            ]
+            if missing:
+                result = (
+                    False,
+                    f"FFmpeg archive is missing {', '.join(missing)}.",
+                )
+                return result if return_reason else result[0]
+
+            empty_binaries = [
+                info.filename
+                for info in zip_ref.infolist()
+                if info.filename.lower().endswith(".exe") and info.file_size == 0
+            ]
+            if empty_binaries:
+                result = (
+                    False,
+                    f"FFmpeg archive contains empty binaries: {', '.join(empty_binaries)}.",
+                )
+                return result if return_reason else result[0]
+    except zipfile.BadZipFile:
+        result = (False, "Downloaded FFmpeg archive is corrupted.")
+        return result if return_reason else result[0]
+    except Exception:
+        result = (False, "Failed to read FFmpeg archive.")
+        return result if return_reason else result[0]
+
+    result = (True, None)
+    return result if return_reason else result[0]
 
 
-def verify_ffmpeg_binaries():
+def verify_ffmpeg_binaries(return_reason: bool = False):
     """
     Verifies the presence of FFmpeg and FFprobe binaries.
     This function checks if the FFmpeg and FFprobe binaries are present in the
-    plugin's root directory. If they are not found there, it checks if they are
-    available in the system's PATH.
+    plugin's root directory.
     Returns:
-        bool: True if both FFmpeg and FFprobe binaries are found, False otherwise.
+        bool | tuple[bool, str | None]: True when binaries are found (and reason when requested).
     """
     ffmpeg_path = os.path.join(PLUGIN_ROOT, "ffmpeg.exe")
     ffprobe_path = os.path.join(PLUGIN_ROOT, "ffprobe.exe")
+    issues = []
 
-    if os.path.exists(ffmpeg_path) and os.path.exists(ffprobe_path):
-        return True
+    if not _is_valid_executable(ffmpeg_path):
+        if os.path.exists(ffmpeg_path):
+            issues.append("ffmpeg.exe is empty or unreadable.")
+        else:
+            issues.append("ffmpeg.exe is missing.")
 
-    if shutil.which("ffmpeg") and shutil.which("ffprobe"):
-        return True
+    if not _is_valid_executable(ffprobe_path):
+        if os.path.exists(ffprobe_path):
+            issues.append("ffprobe.exe is empty or unreadable.")
+        else:
+            issues.append("ffprobe.exe is missing.")
 
-    return False
+    if _is_valid_executable(ffmpeg_path) and _is_valid_executable(ffprobe_path):
+        result = (True, None)
+        return result if return_reason else result[0]
+
+    reason = (
+        " ".join(issues)
+        if issues
+        else "FFmpeg/FFprobe executables are missing or empty."
+    )
+    result = (False, reason)
+    return result if return_reason else result[0]
 
 
 def get_binaries_paths():
@@ -128,13 +204,12 @@ def get_binaries_paths():
     Determines the path to the ffmpeg binaries.
 
     Returns:
-        str: The directory path of the current file if ffmpeg binaries are verified.
-             Otherwise, returns the path to the ffmpeg executable found in the system PATH.
+        str: The directory path of the current file if ffmpeg binaries are verified,
+             otherwise None.
     """
     if verify_ffmpeg_binaries():
         return os.path.dirname(__file__)
-    else:
-        return shutil.which("ffmpeg")
+    return None
 
 
 def verify_ffmpeg():
@@ -142,12 +217,24 @@ def verify_ffmpeg():
     Verify the presence and integrity of FFmpeg.
 
     This function checks if the FFmpeg zip file and binaries are present and valid.
-    It returns True if both the zip file and binaries are verified successfully, otherwise False.
+    It returns (True, None) if either the zip file or binaries are verified successfully,
+    otherwise (False, <reason>) describing the failure.
 
     Returns:
-        bool: True if both FFmpeg zip file and binaries are verified, False otherwise.
+        tuple[bool, str | None]: Validation status and reason when invalid.
     """
-    return verify_ffmpeg_zip() or verify_ffmpeg_binaries()
+    if os.path.exists(FFMPEG_SETUP_LOCK):
+        return False, "Please wait. FFmpeg setup in progress."
+
+    binaries_ok, binaries_reason = verify_ffmpeg_binaries(return_reason=True)
+    if binaries_ok:
+        return True, None
+
+    zip_ok, zip_reason = verify_ffmpeg_zip(return_reason=True)
+    if zip_ok:
+        return True, None
+
+    return False, binaries_reason or zip_reason or "FFmpeg binaries not found."
 
 
 def extract_ffmpeg():
@@ -157,17 +244,38 @@ def extract_ffmpeg():
     If it exists, it extracts the contents of the zip file to the directory of the
     current script and then removes the zip file.
     Note:
-        If an exception occurs during the extraction process, it is silently ignored.
+        If the archive is missing or invalid, the function returns False with a reason.
     Raises:
         None
     """
     ffmpeg_zip = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
 
-    if os.path.exists(ffmpeg_zip):
-        try:
-            with zipfile.ZipFile(ffmpeg_zip, "r") as zip_ref:
-                zip_ref.extractall(os.path.dirname(__file__))
-            os.remove(ffmpeg_zip)
-        except Exception as _:
-            pass
+    if not os.path.exists(ffmpeg_zip):
+        binaries_ok, binaries_reason = verify_ffmpeg_binaries(return_reason=True)
+        if binaries_ok:
+            return True, None
+        return (
+            False,
+            binaries_reason or "FFmpeg archive missing and binaries not present.",
+        )
 
+    zip_ok, zip_reason = verify_ffmpeg_zip(return_reason=True)
+    if not zip_ok:
+        try:
+            os.remove(ffmpeg_zip)
+        except Exception:
+            pass
+        return False, zip_reason
+
+    try:
+        with zipfile.ZipFile(ffmpeg_zip, "r") as zip_ref:
+            zip_ref.extractall(os.path.dirname(__file__))
+        os.remove(ffmpeg_zip)
+    except Exception:
+        return False, "Failed to extract FFmpeg archive."
+
+    binaries_ok, binaries_reason = verify_ffmpeg_binaries(return_reason=True)
+    if not binaries_ok:
+        return False, binaries_reason
+
+    return True, None
