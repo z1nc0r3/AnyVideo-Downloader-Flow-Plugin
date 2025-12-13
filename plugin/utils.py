@@ -131,7 +131,9 @@ def verify_ffmpeg_zip(return_reason: bool = False):
 
             required = ("ffmpeg.exe", "ffprobe.exe")
             missing = [
-                exe for exe in required if not any(name.endswith(exe) for name in members)
+                exe
+                for exe in required
+                if not any(name.endswith(exe) for name in members)
             ]
             if missing:
                 result = (
@@ -190,7 +192,11 @@ def verify_ffmpeg_binaries(return_reason: bool = False):
         result = (True, None)
         return result if return_reason else result[0]
 
-    reason = " ".join(issues) if issues else "FFmpeg/FFprobe executables are missing or empty."
+    reason = (
+        " ".join(issues)
+        if issues
+        else "FFmpeg/FFprobe executables are missing or empty."
+    )
     result = (False, reason)
     return result if return_reason else result[0]
 
@@ -247,7 +253,13 @@ def extract_ffmpeg():
     ffmpeg_zip = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
 
     if not os.path.exists(ffmpeg_zip):
-        return True, None
+        binaries_ok, binaries_reason = verify_ffmpeg_binaries(return_reason=True)
+        if binaries_ok:
+            return True, None
+        return (
+            False,
+            binaries_reason or "FFmpeg archive missing and binaries not present.",
+        )
 
     zip_ok, zip_reason = verify_ffmpeg_zip(return_reason=True)
     if not zip_ok:

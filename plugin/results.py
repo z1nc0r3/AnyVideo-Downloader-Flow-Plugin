@@ -35,10 +35,12 @@ def empty_result() -> Result:
 
 def download_ffmpeg_result(dest_path, issue=None) -> Result:
     subtitle = "Click this to download FFmpeg binaries."
+    title = "FFmpeg binaries not found!"
     if issue:
         subtitle = f"{issue} Click this to download FFmpeg binaries."
+        title = "FFmpeg binaries issue!"
     return Result(
-        Title="FFmpeg binaries not found!",
+        Title=title,
         SubTitle=subtitle,
         IcoPath="Images/error.png",
         JsonRPCAction={"method": "download_ffmpeg_binaries", "parameters": [dest_path]},
