@@ -33,10 +33,13 @@ def empty_result() -> Result:
     return Result(Title="Couldn't find any video formats.", IcoPath="Images/error.png")
 
 
-def download_ffmpeg_result(dest_path) -> Result:
+def download_ffmpeg_result(dest_path, issue=None) -> Result:
+    subtitle = "Click this to download FFmpeg binaries."
+    if issue:
+        subtitle = f"{issue} Click this to download FFmpeg binaries."
     return Result(
         Title="FFmpeg binaries not found!",
-        SubTitle="Click this to download FFmpeg binaries.",
+        SubTitle=subtitle,
         IcoPath="Images/error.png",
         JsonRPCAction={"method": "download_ffmpeg_binaries", "parameters": [dest_path]},
     )

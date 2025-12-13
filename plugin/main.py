@@ -19,6 +19,7 @@ from utils import (
     sort_by_size,
     verify_ffmpeg_binaries,
     verify_ffmpeg,
+    verify_ffmpeg_zip,
     extract_ffmpeg,
     get_binaries_paths,
 )
@@ -73,10 +74,13 @@ def fetch_settings() -> Tuple[str, str, str, str]:
 def query(query: str) -> ResultResponse:
     d_path, sort, pvf, paf = fetch_settings()
 
-    if not verify_ffmpeg():
-        return send_results([download_ffmpeg_result(PLUGIN_ROOT)])
+    verified, verify_reason = verify_ffmpeg()
+    if not verified:
+        return send_results([download_ffmpeg_result(PLUGIN_ROOT, verify_reason)])
 
-    extract_ffmpeg()
+    extracted, extract_reason = extract_ffmpeg()
+    if not extracted:
+        return send_results([download_ffmpeg_result(PLUGIN_ROOT, extract_reason)])
 
     if not query.strip():
         return send_results([init_results(d_path)])
@@ -159,6 +163,13 @@ def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
             subprocess.run(f'curl -L "{BIN_URL}" -o "{FFMPEG_ZIP}"', shell=True, check=True)
         except Exception:
             pass
+
+    if not os.path.exists(FFMPEG_ZIP):
+        return
+
+    zip_ok, zip_reason = verify_ffmpeg_zip(return_reason=True)
+    if not zip_ok and zip_reason:
+        print(f"FFmpeg download validation failed: {zip_reason}")
 
 
 @plugin.on_method
