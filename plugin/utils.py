@@ -106,7 +106,7 @@ def verify_ffmpeg_zip(return_reason: bool = False):
     Checks if a valid ffmpeg.zip file exists in the plugin directory.
 
     Returns:
-        bool | tuple[bool, str | None]: Validation status (and optional reason when
+        Union[bool, Tuple[bool, Optional[str]]]: Validation status (and optional reason when
         return_reason=True).
     """
     ffmpeg_zip = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
