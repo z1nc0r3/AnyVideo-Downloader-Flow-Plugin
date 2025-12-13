@@ -110,35 +110,35 @@ def verify_ffmpeg_zip(return_reason: bool = False):
         return_reason=True).
     """
     ffmpeg_zip = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
+    build = (
+        (lambda ok, reason=None: (ok, reason))
+        if return_reason
+        else (lambda ok, _reason=None: ok)
+    )
+
     if not os.path.exists(ffmpeg_zip):
-        result = (False, "FFmpeg zip is missing.")
-        return result if return_reason else result[0]
+        return build(False, "FFmpeg zip is missing.")
 
     try:
         if os.path.getsize(ffmpeg_zip) == 0:
-            result = (False, "Downloaded FFmpeg archive is empty.")
-            return result if return_reason else result[0]
+            return build(False, "Downloaded FFmpeg archive is empty.")
     except OSError:
-        result = (False, "Failed to read FFmpeg archive.")
-        return result if return_reason else result[0]
+        return build(False, "Failed to read FFmpeg archive.")
 
     try:
         with zipfile.ZipFile(ffmpeg_zip, "r") as zip_ref:
             members = zip_ref.namelist()
             if not members:
-                result = (False, "Downloaded FFmpeg archive is empty.")
-                return result if return_reason else result[0]
+                return build(False, "Downloaded FFmpeg archive is empty.")
 
             required = ("ffmpeg.exe", "ffprobe.exe")
             missing = [
-                exe for exe in required if not any(os.path.basename(name) == exe for name in members)
+                exe
+                for exe in required
+                if not any(os.path.basename(name) == exe for name in members)
             ]
             if missing:
-                result = (
-                    False,
-                    f"FFmpeg archive is missing {', '.join(missing)}.",
-                )
-                return result if return_reason else result[0]
+                return build(False, f"FFmpeg archive is missing {', '.join(missing)}.")
 
             empty_binaries = [
                 info.filename
@@ -146,20 +146,16 @@ def verify_ffmpeg_zip(return_reason: bool = False):
                 if info.filename.lower().endswith(".exe") and info.file_size == 0
             ]
             if empty_binaries:
-                result = (
+                return build(
                     False,
                     f"FFmpeg archive contains empty binaries: {', '.join(empty_binaries)}.",
                 )
-                return result if return_reason else result[0]
     except zipfile.BadZipFile:
-        result = (False, "Downloaded FFmpeg archive is corrupted.")
-        return result if return_reason else result[0]
+        return build(False, "Downloaded FFmpeg archive is corrupted.")
     except Exception:
-        result = (False, "Failed to read FFmpeg archive.")
-        return result if return_reason else result[0]
+        return build(False, "Failed to read FFmpeg archive.")
 
-    result = (True, None)
-    return result if return_reason else result[0]
+    return build(True, None)
 
 
 def verify_ffmpeg_binaries(return_reason: bool = False):
@@ -172,31 +168,36 @@ def verify_ffmpeg_binaries(return_reason: bool = False):
     """
     ffmpeg_path = os.path.join(PLUGIN_ROOT, "ffmpeg.exe")
     ffprobe_path = os.path.join(PLUGIN_ROOT, "ffprobe.exe")
+    build = (
+        (lambda ok, reason=None: (ok, reason))
+        if return_reason
+        else (lambda ok, _reason=None: ok)
+    )
+    ffmpeg_ok = _is_valid_executable(ffmpeg_path)
+    ffprobe_ok = _is_valid_executable(ffprobe_path)
     issues = []
 
-    if not _is_valid_executable(ffmpeg_path):
+    if not ffmpeg_ok:
         if os.path.exists(ffmpeg_path):
             issues.append("ffmpeg.exe is empty or unreadable.")
         else:
             issues.append("ffmpeg.exe is missing.")
 
-    if not _is_valid_executable(ffprobe_path):
+    if not ffprobe_ok:
         if os.path.exists(ffprobe_path):
             issues.append("ffprobe.exe is empty or unreadable.")
         else:
             issues.append("ffprobe.exe is missing.")
 
-    if _is_valid_executable(ffmpeg_path) and _is_valid_executable(ffprobe_path):
-        result = (True, None)
-        return result if return_reason else result[0]
+    if ffmpeg_ok and ffprobe_ok:
+        return build(True, None)
 
     reason = (
         " ".join(issues)
         if issues
         else "FFmpeg/FFprobe executables are missing or empty."
     )
-    result = (False, reason)
-    return result if return_reason else result[0]
+    return build(False, reason)
 
 
 def get_binaries_paths():
