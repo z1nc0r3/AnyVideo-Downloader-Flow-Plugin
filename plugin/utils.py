@@ -131,9 +131,7 @@ def verify_ffmpeg_zip(return_reason: bool = False):
 
             required = ("ffmpeg.exe", "ffprobe.exe")
             missing = [
-                exe
-                for exe in required
-                if not any(name.endswith(exe) for name in members)
+                exe for exe in required if not any(os.path.basename(name) == exe for name in members)
             ]
             if missing:
                 result = (
