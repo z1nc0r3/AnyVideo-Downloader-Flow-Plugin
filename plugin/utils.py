@@ -1,6 +1,7 @@
 import re
 import os
 import zipfile
+import subprocess
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 FFMPEG_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
