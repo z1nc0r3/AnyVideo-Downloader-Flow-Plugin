@@ -287,3 +287,65 @@ def extract_ffmpeg():
         return False, binaries_reason
 
     return True, None
+
+
+def check_ytdlp_update_needed(check_interval_days=5):
+    """
+    Check if yt-dlp library update is needed based on the last update timestamp.
+    
+    Args:
+        check_interval_days (int): Number of days between update checks.
+    
+    Returns:
+        bool: True if update is needed, False otherwise.
+    """
+    from datetime import datetime, timedelta
+    
+    # Path to yt-dlp package in lib folder
+    lib_ytdlp_path = os.path.join(os.path.dirname(__file__), "..", "lib", "yt_dlp")
+    lib_ytdlp_path = os.path.abspath(lib_ytdlp_path)  # Normalize path
+    update_marker = os.path.join(os.path.dirname(lib_ytdlp_path), ".ytdlp_last_update")
+    
+    # If yt-dlp doesn't exist in lib, update is needed
+    if not os.path.exists(lib_ytdlp_path):
+        return True
+    
+    # Check the update marker file
+    if os.path.exists(update_marker):
+        try:
+            last_update = datetime.fromtimestamp(os.path.getmtime(update_marker))
+            if datetime.now() - last_update < timedelta(days=check_interval_days):
+                return False
+        except Exception:
+            pass
+    
+    return True
+
+
+def update_ytdlp_library():
+    """
+    Update the bundled yt-dlp library in the lib folder.
+    
+    Returns:
+        tuple: (success: bool, message: str)
+    """
+    
+    lib_path = os.path.join(os.path.dirname(__file__), "..", "lib")
+    lib_path = os.path.abspath(lib_path)
+    update_marker = os.path.join(lib_path, ".ytdlp_last_update")
+    
+    try:
+        subprocess.run(
+            ["pip", "install", "--upgrade", "--target", lib_path, "yt-dlp"],
+            check=True,
+        )
+        
+        os.makedirs(lib_path, exist_ok=True)
+        with open(update_marker, "w") as f:
+            f.write("updated")
+            
+        return True, "yt-dlp library updated successfully"
+    except subprocess.CalledProcessError as e:
+        return False, f"Update failed with code {e.returncode}"
+    except Exception as e:
+        return False, f"Update error: {str(e)}"
