@@ -22,6 +22,8 @@ from utils import (
     verify_ffmpeg_zip,
     extract_ffmpeg,
     get_binaries_paths,
+    check_ytdlp_update_needed,
+    update_ytdlp_library,
 )
 from results import (
     init_results,
@@ -32,6 +34,8 @@ from results import (
     download_ffmpeg_result,
     ffmpeg_setup_result,
     ffmpeg_not_found_result,
+    update_ytdlp_result,
+    ytdlp_update_in_progress_result,
 )
 from ytdlp import CustomYoutubeDL
 
@@ -92,6 +96,34 @@ def query(query: str) -> ResultResponse:
         return send_results([invalid_result()])
 
     query = query.replace("https://", "http://")
+    
+    # Check if yt-dlp library needs update before processing
+    lib_path = os.path.join(PLUGIN_ROOT, "..", "lib")
+    lib_path = os.path.abspath(lib_path)
+    update_lock = os.path.join(lib_path, ".ytdlp_updating")
+    
+    # Check if update is in progress, but ignore stale locks
+    if os.path.exists(update_lock):
+        try:
+            lock_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(update_lock))
+            if lock_age < timedelta(minutes=5):
+                return send_results([ytdlp_update_in_progress_result()])
+            else:
+                try:
+                    os.remove(update_lock)
+                except Exception:
+                    pass
+        except Exception:
+            # If we can't check lock age, assume update is in progress to be safe
+            return send_results([ytdlp_update_in_progress_result()])
+    
+    if check_ytdlp_update_needed(CHECK_INTERVAL_DAYS):
+        try:
+            import yt_dlp
+            current_version = yt_dlp.version.__version__
+        except:
+            current_version = None
+        return send_results([update_ytdlp_result(current_version)])
 
     ydl_opts = {
         "quiet": True,
@@ -193,6 +225,34 @@ def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
 
         extract_ffmpeg()
     finally:
+        try:
+            if os.path.exists(lock_path):
+                os.remove(lock_path)
+        except Exception:
+            pass
+
+
+@plugin.on_method
+def update_ytdlp_library_action() -> None:
+    """Update the yt-dlp library when user clicks the update prompt."""
+    lib_path = os.path.join(PLUGIN_ROOT, "..", "lib")
+    lib_path = os.path.abspath(lib_path)
+    lock_path = os.path.join(lib_path, ".ytdlp_updating")
+    
+    # Create lock file to prevent concurrent updates
+    try:
+        os.makedirs(lib_path, exist_ok=True)
+        with open(lock_path, "w") as lock_file:
+            lock_file.write("in-progress")
+    except Exception as _:
+        return
+    
+    try:
+        update_ytdlp_library()
+    except Exception as _:
+        pass
+    finally:
+        # Always remove lock file, even if update fails or is interrupted
         try:
             if os.path.exists(lock_path):
                 os.remove(lock_path)
