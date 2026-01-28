@@ -135,9 +135,6 @@ def query(query: str) -> ResultResponse:
     ydl = CustomYoutubeDL(params=ydl_opts)
     info = ydl.extract_info(query)
 
-    if ydl.error_message:
-        return send_results([error_result()])
-
     formats = [
         {
             "format_id": format.get("format_id"),
@@ -151,6 +148,8 @@ def query(query: str) -> ResultResponse:
     ]
 
     if not formats:
+        if ydl.error_message:
+            return send_results([error_result()])
         return send_results([empty_result()])
 
     if sort == "Resolution":
