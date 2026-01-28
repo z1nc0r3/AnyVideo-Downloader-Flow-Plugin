@@ -42,4 +42,9 @@ body:
               - flac
               - aac
               - opus
-            
+    - type: checkbox
+      attributes:
+          name: auto_open_folder
+          label: "Auto-open download folder"
+          defaultValue: true
+          description: "Automatically open the download folder after download completes."
