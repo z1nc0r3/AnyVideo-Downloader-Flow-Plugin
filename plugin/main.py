@@ -22,6 +22,8 @@ from utils import (
     verify_ffmpeg_zip,
     extract_ffmpeg,
     get_binaries_paths,
+    check_ytdlp_update_needed,
+    update_ytdlp_library,
 )
 from results import (
     init_results,
@@ -32,10 +34,13 @@ from results import (
     download_ffmpeg_result,
     ffmpeg_setup_result,
     ffmpeg_not_found_result,
+    update_ytdlp_result,
+    ytdlp_update_in_progress_result,
 )
 from ytdlp import CustomYoutubeDL
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
+LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
 EXE_PATH = os.path.join(PLUGIN_ROOT, "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 5
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
@@ -92,6 +97,33 @@ def query(query: str) -> ResultResponse:
         return send_results([invalid_result()])
 
     query = query.replace("https://", "http://")
+    
+    # Check if yt-dlp library needs update before processing
+    update_lock = os.path.join(LIB_PATH, ".ytdlp_updating")
+    
+    # Check if update is in progress, but ignore stale locks
+    if os.path.exists(update_lock):
+        try:
+            lock_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(update_lock))
+            if lock_age < timedelta(minutes=5):
+                return send_results([ytdlp_update_in_progress_result()])
+            else:
+                try:
+                    os.remove(update_lock)
+                except Exception:
+                    # Best-effort cleanup of stale update lock; ignore failures as they are non-fatal.
+                    pass
+        except Exception:
+            # If we can't check lock age, assume update is in progress to be safe
+            return send_results([ytdlp_update_in_progress_result()])
+    
+    if check_ytdlp_update_needed(CHECK_INTERVAL_DAYS):
+        try:
+            import yt_dlp
+            current_version = yt_dlp.version.__version__
+        except:
+            current_version = None
+        return send_results([update_ytdlp_result(current_version)])
 
     ydl_opts = {
         "quiet": True,
@@ -126,7 +158,7 @@ def query(query: str) -> ResultResponse:
         formats = sort_by_tbr(formats)
     elif sort == "FPS":
         formats = sort_by_fps(formats)
-
+        
     results = []
 
     if not verify_ffmpeg_binaries():
@@ -181,20 +213,42 @@ def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
         if not os.path.exists(FFMPEG_ZIP):
             return
 
-        zip_ok, zip_reason = verify_ffmpeg_zip(return_reason=True)
+        zip_ok, _ = verify_ffmpeg_zip(return_reason=True)
         if not zip_ok:
-            if zip_reason:
-                print(f"FFmpeg download validation failed: {zip_reason}")
             try:
                 os.remove(FFMPEG_ZIP)
             except Exception:
                 pass
             return
 
-        extracted, extract_reason = extract_ffmpeg()
-        if not extracted and extract_reason:
-            print(f"FFmpeg extraction failed: {extract_reason}")
+        extract_ffmpeg()
     finally:
+        try:
+            if os.path.exists(lock_path):
+                os.remove(lock_path)
+        except Exception:
+            pass
+
+
+@plugin.on_method
+def update_ytdlp_library_action() -> None:
+    """Update the yt-dlp library when user clicks the update prompt."""
+    lock_path = os.path.join(LIB_PATH, ".ytdlp_updating")
+    
+    # Create lock file to prevent concurrent updates
+    try:
+        os.makedirs(LIB_PATH, exist_ok=True)
+        with open(lock_path, "w") as lock_file:
+            lock_file.write("in-progress")
+    except Exception as _:
+        return
+    
+    try:
+        update_ytdlp_library()
+    except Exception as _:
+        return
+    finally:
+        # Always remove lock file, even if update fails or is interrupted
         try:
             if os.path.exists(lock_path):
                 os.remove(lock_path)

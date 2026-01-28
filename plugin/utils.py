@@ -1,8 +1,12 @@
 import re
 import os
 import zipfile
+import subprocess
+import sys
+from datetime import datetime, timedelta
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
+LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
 FFMPEG_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
 URL_REGEX = (
     "((http|https)://)(www.)?"
@@ -280,3 +284,74 @@ def extract_ffmpeg():
         return False, binaries_reason
 
     return True, None
+
+
+def check_ytdlp_update_needed(check_interval_days=5):
+    """
+    Check if yt-dlp library update is needed based on the last update timestamp.
+    
+    Args:
+        check_interval_days (int): Number of days between update checks.
+    
+    Returns:
+        bool: True if update is needed, False otherwise.
+    """
+    
+    # Path to yt-dlp package in lib folder
+    lib_ytdlp_path = os.path.join(LIB_PATH, "yt_dlp")
+    update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
+    
+    # If yt-dlp doesn't exist in lib, update is needed
+    if not os.path.exists(lib_ytdlp_path):
+        return True
+    
+    # Check the update marker file
+    if os.path.exists(update_marker):
+        try:
+            last_update = datetime.fromtimestamp(os.path.getmtime(update_marker))
+            if datetime.now() - last_update < timedelta(days=check_interval_days):
+                return False
+        except Exception:
+            # If we can't read the marker, assume update is needed
+            return True
+    
+    return True
+
+
+def update_ytdlp_library():
+    """
+    Update the bundled yt-dlp library in the lib folder.
+    
+    Returns:
+        tuple: (success: bool, message: str)
+    """
+    
+    update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
+    
+    # Try different pip commands in order of preference
+    pip_commands = [
+        [sys.executable, "-m", "pip", "install", "--upgrade", "--target", LIB_PATH, "yt-dlp"],
+        ["python", "-m", "pip", "install", "--upgrade", "--target", LIB_PATH, "yt-dlp"],
+        ["pip", "install", "--upgrade", "--target", LIB_PATH, "yt-dlp"],
+    ]
+    
+    last_error = None
+    for cmd in pip_commands:
+        try:
+            subprocess.run(cmd, check=True, timeout=120)
+            
+            # Create/update the marker file
+            os.makedirs(LIB_PATH, exist_ok=True)
+            with open(update_marker, "w") as f:
+                f.write("updated")
+                
+            return True, "yt-dlp library updated successfully"
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as e:
+            last_error = e
+            continue
+    
+    # All commands failed
+    if isinstance(last_error, subprocess.TimeoutExpired):
+        return False, "Update timed out after 2 minutes"
+    else:
+        return False, f"All pip commands failed. Last error: {str(last_error)}"

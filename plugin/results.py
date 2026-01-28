@@ -55,12 +55,47 @@ def ffmpeg_setup_result(issue) -> Result:
     )
 
 
+def update_ytdlp_result(current_version=None) -> Result:
+    subtitle = "Click to update yt-dlp library to the latest version."
+    if current_version:
+        subtitle = f"Current version: {current_version}. Click to update."
+    return Result(
+        Title="yt-dlp library update available!",
+        SubTitle=subtitle,
+        IcoPath="Images/app.png",
+        JsonRPCAction={"method": "update_ytdlp_library_action", "parameters": []},
+    )
+
+
+def ytdlp_update_in_progress_result() -> Result:
+    return Result(
+        Title="yt-dlp update in progress...",
+        SubTitle="Please wait a moment and try again.",
+        IcoPath="Images/app.png",
+    )
+
+
 def query_result(
     query, thumbnail, title, format, download_path, pref_video_path, pref_audio_path
 ) -> Result:
+    # Build subtitle with consistent spacing
+    subtitle_parts = [f"Res: {format['resolution']}"]
+    
+    if format.get('tbr') is not None:
+        subtitle_parts.append(f"({round(format['tbr'], 2)} kbps)")
+    
+    if format.get('filesize'):
+        size_mb = round(format['filesize'] / 1024 / 1024, 2)
+        subtitle_parts.append(f"Size: {size_mb}MB")
+    
+    if format.get('fps'):
+        subtitle_parts.append(f"FPS: {int(format['fps'])}")
+    
+    subtitle = " ┃ ".join(subtitle_parts)
+    
     return Result(
         Title=title,
-        SubTitle=f"Res: {format['resolution']} ({round(format['tbr'], 2)} kbps) {'┃ Size: ' + str(round(format['filesize'] / 1024 / 1024, 2)) + 'MB' if format.get('filesize') else ''} {'┃ FPS: ' + str(int(format['fps'])) if format.get('fps') else ''}",
+        SubTitle=subtitle,
         IcoPath=thumbnail or "Images/app.png",
         JsonRPCAction={
             "method": "download",
