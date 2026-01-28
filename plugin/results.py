@@ -76,7 +76,7 @@ def ytdlp_update_in_progress_result() -> Result:
 
 
 def query_result(
-    query, thumbnail, title, format, download_path, pref_video_path, pref_audio_path
+    query, thumbnail, title, format, download_path, pref_video_path, pref_audio_path, auto_open_folder=False
 ) -> Result:
     # Build subtitle with consistent spacing
     subtitle_parts = [f"Res: {format['resolution']}"]
@@ -106,6 +106,7 @@ def query_result(
                 pref_video_path,
                 pref_audio_path,
                 format["resolution"] == "audio only",
+                auto_open_folder,
             ],
         },
     )
