@@ -337,6 +337,7 @@ def update_ytdlp_library():
         subprocess.run(
             ["pip", "install", "--upgrade", "--target", LIB_PATH, "yt-dlp"],
             check=True,
+            timeout=120,  # 2 minute timeout
         )
         
         os.makedirs(LIB_PATH, exist_ok=True)
@@ -344,6 +345,8 @@ def update_ytdlp_library():
             f.write("updated")
             
         return True, "yt-dlp library updated successfully"
+    except subprocess.TimeoutExpired:
+        return False, "Update timed out after 2 minutes"
     except subprocess.CalledProcessError as e:
         return False, f"Update failed with code {e.returncode}"
     except Exception as e:
