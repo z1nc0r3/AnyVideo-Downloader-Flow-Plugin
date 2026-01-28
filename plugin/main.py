@@ -68,7 +68,7 @@ def fetch_settings() -> Tuple[str, str, str, str, bool]:
         sorting_order = settings().get("sorting_order") or "Resolution"
         pref_video_format = settings().get("preferred_video_format") or "mp4"
         pref_audio_format = settings().get("preferred_audio_format") or "mp3"
-        auto_open_folder = settings().get("auto_open_folder") or False
+        auto_open_folder = settings().get("auto_open_folder") or True
     except Exception:
         download_path = DEFAULT_DOWNLOAD_PATH
         sorting_order = "Resolution"
