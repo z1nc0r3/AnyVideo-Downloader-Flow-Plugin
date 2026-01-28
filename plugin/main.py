@@ -319,6 +319,10 @@ def download(
         "--no-mtime",
         "--force-overwrites",
         "--no-part",
+        "--retries",
+        "3",
+        "--retry-sleep",
+        "2",
     ]
 
     if ffmpeg_path:
