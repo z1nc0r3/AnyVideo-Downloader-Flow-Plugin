@@ -60,7 +60,7 @@ def query_result(
 ) -> Result:
     return Result(
         Title=title,
-        SubTitle=f"Res: {format['resolution']} ({round(format['tbr'], 2)} kbps) {'┃ Size: ' + str(round(format['filesize'] / 1024 / 1024, 2)) + 'MB' if format.get('filesize') else ''} {'┃ FPS: ' + str(int(format['fps'])) if format.get('fps') else ''}",
+        SubTitle=f"Res: {format['resolution']} {('(' + str(round(format['tbr'], 2)) + ' kbps)') if format.get('tbr') else ''} {'┃ Size: ' + str(round(format['filesize'] / 1024 / 1024, 2)) + 'MB' if format.get('filesize') else ''} {'┃ FPS: ' + str(int(format['fps'])) if format.get('fps') else ''}",
         IcoPath=thumbnail or "Images/app.png",
         JsonRPCAction={
             "method": "download",

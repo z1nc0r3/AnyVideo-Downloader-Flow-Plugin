@@ -52,8 +52,15 @@ def sort_by_tbr(formats):
 
     Returns:
         list: The input list sorted by the 'tbr' value in descending order.
+              Formats with None tbr values are placed at the end.
     """
-    return sorted(formats, key=lambda x: x["tbr"], reverse=True)
+    return sorted(
+        formats,
+        key=lambda x: (
+            x["tbr"] is None,
+            -x["tbr"] if x["tbr"] is not None else float("-inf"),
+        ),
+    )
 
 
 def sort_by_fps(formats):
