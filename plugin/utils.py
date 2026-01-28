@@ -4,6 +4,7 @@ import zipfile
 import subprocess
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
+LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
 FFMPEG_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
 URL_REGEX = (
     "((http|https)://)(www.)?"
@@ -303,9 +304,8 @@ def check_ytdlp_update_needed(check_interval_days=5):
     from datetime import datetime, timedelta
     
     # Path to yt-dlp package in lib folder
-    lib_ytdlp_path = os.path.join(os.path.dirname(__file__), "..", "lib", "yt_dlp")
-    lib_ytdlp_path = os.path.abspath(lib_ytdlp_path)  # Normalize path
-    update_marker = os.path.join(os.path.dirname(lib_ytdlp_path), ".ytdlp_last_update")
+    lib_ytdlp_path = os.path.join(LIB_PATH, "yt_dlp")
+    update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
     
     # If yt-dlp doesn't exist in lib, update is needed
     if not os.path.exists(lib_ytdlp_path):
@@ -331,17 +331,15 @@ def update_ytdlp_library():
         tuple: (success: bool, message: str)
     """
     
-    lib_path = os.path.join(os.path.dirname(__file__), "..", "lib")
-    lib_path = os.path.abspath(lib_path)
-    update_marker = os.path.join(lib_path, ".ytdlp_last_update")
+    update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
     
     try:
         subprocess.run(
-            ["pip", "install", "--upgrade", "--target", lib_path, "yt-dlp"],
+            ["pip", "install", "--upgrade", "--target", LIB_PATH, "yt-dlp"],
             check=True,
         )
         
-        os.makedirs(lib_path, exist_ok=True)
+        os.makedirs(LIB_PATH, exist_ok=True)
         with open(update_marker, "w") as f:
             f.write("updated")
             

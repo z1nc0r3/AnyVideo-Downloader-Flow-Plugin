@@ -40,6 +40,7 @@ from results import (
 from ytdlp import CustomYoutubeDL
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
+LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
 EXE_PATH = os.path.join(PLUGIN_ROOT, "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 5
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
@@ -98,9 +99,7 @@ def query(query: str) -> ResultResponse:
     query = query.replace("https://", "http://")
     
     # Check if yt-dlp library needs update before processing
-    lib_path = os.path.join(PLUGIN_ROOT, "..", "lib")
-    lib_path = os.path.abspath(lib_path)
-    update_lock = os.path.join(lib_path, ".ytdlp_updating")
+    update_lock = os.path.join(LIB_PATH, ".ytdlp_updating")
     
     # Check if update is in progress, but ignore stale locks
     if os.path.exists(update_lock):
@@ -235,13 +234,11 @@ def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
 @plugin.on_method
 def update_ytdlp_library_action() -> None:
     """Update the yt-dlp library when user clicks the update prompt."""
-    lib_path = os.path.join(PLUGIN_ROOT, "..", "lib")
-    lib_path = os.path.abspath(lib_path)
-    lock_path = os.path.join(lib_path, ".ytdlp_updating")
+    lock_path = os.path.join(LIB_PATH, ".ytdlp_updating")
     
     # Create lock file to prevent concurrent updates
     try:
-        os.makedirs(lib_path, exist_ok=True)
+        os.makedirs(LIB_PATH, exist_ok=True)
         with open(lock_path, "w") as lock_file:
             lock_file.write("in-progress")
     except Exception as _:
