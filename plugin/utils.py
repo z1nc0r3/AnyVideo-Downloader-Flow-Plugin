@@ -3,6 +3,7 @@ import os
 import zipfile
 import subprocess
 import sys
+from datetime import datetime, timedelta
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
@@ -302,7 +303,6 @@ def check_ytdlp_update_needed(check_interval_days=5):
     Returns:
         bool: True if update is needed, False otherwise.
     """
-    from datetime import datetime, timedelta
     
     # Path to yt-dlp package in lib folder
     lib_ytdlp_path = os.path.join(LIB_PATH, "yt_dlp")
@@ -319,7 +319,7 @@ def check_ytdlp_update_needed(check_interval_days=5):
             if datetime.now() - last_update < timedelta(days=check_interval_days):
                 return False
         except Exception:
-            pass
+            return False
     
     return True
 

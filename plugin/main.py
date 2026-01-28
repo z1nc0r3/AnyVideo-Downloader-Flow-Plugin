@@ -111,6 +111,7 @@ def query(query: str) -> ResultResponse:
                 try:
                     os.remove(update_lock)
                 except Exception:
+                    # Best-effort cleanup of stale update lock; ignore failures as they are non-fatal.
                     pass
         except Exception:
             # If we can't check lock age, assume update is in progress to be safe
@@ -247,7 +248,7 @@ def update_ytdlp_library_action() -> None:
     try:
         update_ytdlp_library()
     except Exception as _:
-        pass
+        return
     finally:
         # Always remove lock file, even if update fails or is interrupted
         try:
