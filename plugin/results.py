@@ -78,9 +78,24 @@ def ytdlp_update_in_progress_result() -> Result:
 def query_result(
     query, thumbnail, title, format, download_path, pref_video_path, pref_audio_path
 ) -> Result:
+    # Build subtitle with consistent spacing
+    subtitle_parts = [f"Res: {format['resolution']}"]
+    
+    if format.get('tbr') is not None:
+        subtitle_parts.append(f"({round(format['tbr'], 2)} kbps)")
+    
+    if format.get('filesize'):
+        size_mb = round(format['filesize'] / 1024 / 1024, 2)
+        subtitle_parts.append(f"Size: {size_mb}MB")
+    
+    if format.get('fps'):
+        subtitle_parts.append(f"FPS: {int(format['fps'])}")
+    
+    subtitle = " ┃ ".join(subtitle_parts)
+    
     return Result(
         Title=title,
-        SubTitle=f"Res: {format['resolution']} {('(' + str(round(format['tbr'], 2)) + ' kbps)') if format.get('tbr') is not None else ''} {'┃ Size: ' + str(round(format['filesize'] / 1024 / 1024, 2)) + 'MB' if format.get('filesize') else ''} {'┃ FPS: ' + str(int(format['fps'])) if format.get('fps') else ''}",
+        SubTitle=subtitle,
         IcoPath=thumbnail or "Images/app.png",
         JsonRPCAction={
             "method": "download",
