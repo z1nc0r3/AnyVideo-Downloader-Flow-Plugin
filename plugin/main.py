@@ -115,6 +115,7 @@ def query(query: str) -> ResultResponse:
         if format.get("resolution") and format.get("tbr")
     ]
 
+
     if not formats:
         return send_results([empty_result()])
 
@@ -126,6 +127,7 @@ def query(query: str) -> ResultResponse:
         formats = sort_by_tbr(formats)
     elif sort == "FPS":
         formats = sort_by_fps(formats)
+        
 
     results = []
 
@@ -181,19 +183,15 @@ def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
         if not os.path.exists(FFMPEG_ZIP):
             return
 
-        zip_ok, zip_reason = verify_ffmpeg_zip(return_reason=True)
+        zip_ok, _ = verify_ffmpeg_zip(return_reason=True)
         if not zip_ok:
-            if zip_reason:
-                print(f"FFmpeg download validation failed: {zip_reason}")
             try:
                 os.remove(FFMPEG_ZIP)
             except Exception:
                 pass
             return
 
-        extracted, extract_reason = extract_ffmpeg()
-        if not extracted and extract_reason:
-            print(f"FFmpeg extraction failed: {extract_reason}")
+        extract_ffmpeg()
     finally:
         try:
             if os.path.exists(lock_path):
