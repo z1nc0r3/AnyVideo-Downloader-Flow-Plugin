@@ -68,7 +68,7 @@ def fetch_settings() -> Tuple[str, str, str, str, bool]:
         sorting_order = settings().get("sorting_order") or "Resolution"
         pref_video_format = settings().get("preferred_video_format") or "mp4"
         pref_audio_format = settings().get("preferred_audio_format") or "mp3"
-        auto_open_folder = settings().get("auto_open_folder") or True
+        auto_open_folder = settings().get("auto_open_folder", True)
     except Exception:
         download_path = DEFAULT_DOWNLOAD_PATH
         sorting_order = "Resolution"
@@ -342,8 +342,12 @@ def download(
     command = [arg for arg in command if arg is not None and arg != ""]
 
     try:
-        subprocess.run(command)
-        if auto_open_folder and os.path.exists(download_path):
+        result = subprocess.run(command)
+        if (
+            result.returncode == 0
+            and auto_open_folder
+            and os.path.isdir(download_path)
+        ):
             os.startfile(download_path)
     except Exception:
         pass
