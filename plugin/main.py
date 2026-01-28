@@ -344,7 +344,7 @@ def download(
     try:
         subprocess.run(command)
         if auto_open_folder and os.path.exists(download_path):
-            subprocess.run(f'explorer "{download_path}"')
+            os.startfile(download_path)
     except Exception:
         pass
 
