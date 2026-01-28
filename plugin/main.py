@@ -48,16 +48,17 @@ DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 plugin = Plugin()
 
 
-def fetch_settings() -> Tuple[str, str, str, str]:
+def fetch_settings() -> Tuple[str, str, str, str, bool]:
     """
     Fetches the user settings for the plugin.
 
     Returns:
-        Tuple[str, str, str, str]: A tuple containing:
+        Tuple[str, str, str, str, bool]: A tuple containing:
             - download_path (str): The path where videos will be downloaded.
             - sorting_order (str): The order in which videos will be sorted (default is "Resolution").
             - pref_video_format (str): The preferred video format (default is "mp4").
             - pref_audio_format (str): The preferred audio format (default is "mp3").
+            - auto_open_folder (bool): Whether to automatically open the download folder after download.
     """
     try:
         download_path = settings().get("download_path") or DEFAULT_DOWNLOAD_PATH
@@ -67,18 +68,20 @@ def fetch_settings() -> Tuple[str, str, str, str]:
         sorting_order = settings().get("sorting_order") or "Resolution"
         pref_video_format = settings().get("preferred_video_format") or "mp4"
         pref_audio_format = settings().get("preferred_audio_format") or "mp3"
+        auto_open_folder = settings().get("auto_open_folder") or False
     except Exception:
         download_path = DEFAULT_DOWNLOAD_PATH
         sorting_order = "Resolution"
         pref_video_format = "mp4"
         pref_audio_format = "mp3"
+        auto_open_folder = False
 
-    return download_path, sorting_order, pref_video_format, pref_audio_format
+    return download_path, sorting_order, pref_video_format, pref_audio_format, auto_open_folder
 
 
 @plugin.on_method
 def query(query: str) -> ResultResponse:
-    d_path, sort, pvf, paf = fetch_settings()
+    d_path, sort, pvf, paf, auto_open = fetch_settings()
 
     verified, verify_reason = verify_ffmpeg()
     if not verified:
@@ -174,6 +177,7 @@ def query(query: str) -> ResultResponse:
                 d_path,
                 pvf,
                 paf,
+                auto_open,
             )
             for format in formats
         ]
@@ -264,6 +268,7 @@ def download(
     pref_video_path: str,
     pref_audio_path: str,
     is_audio: bool,
+    auto_open_folder: bool = False,
 ) -> None:
     try:
         last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
@@ -334,6 +339,8 @@ def download(
 
     try:
         subprocess.run(command)
+        if auto_open_folder and os.path.exists(download_path):
+            subprocess.run(f'explorer "{download_path}"')
     except Exception:
         pass
 
