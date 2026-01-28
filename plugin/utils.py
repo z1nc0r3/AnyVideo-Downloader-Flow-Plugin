@@ -57,7 +57,7 @@ def sort_by_tbr(formats):
     Returns:
         list: The input list sorted by the 'tbr' value in descending order.
     """
-    return sorted(formats, key=lambda x: -x["tbr"])
+    return sorted(formats, key=lambda x: x["tbr"], reverse=True)
 
 
 def sort_by_fps(formats):
@@ -312,7 +312,8 @@ def check_ytdlp_update_needed(check_interval_days=5):
             if datetime.now() - last_update < timedelta(days=check_interval_days):
                 return False
         except Exception:
-            return False
+            # If we can't read the marker, assume update is needed
+            return True
     
     return True
 

@@ -147,7 +147,6 @@ def query(query: str) -> ResultResponse:
         if format.get("resolution") and format.get("tbr")
     ]
 
-
     if not formats:
         return send_results([empty_result()])
 
@@ -160,7 +159,6 @@ def query(query: str) -> ResultResponse:
     elif sort == "FPS":
         formats = sort_by_fps(formats)
         
-
     results = []
 
     if not verify_ffmpeg_binaries():
