@@ -32,6 +32,8 @@ from results import (
     error_result,
     empty_result,
     query_result,
+    best_video_result,
+    best_audio_result,
     download_ffmpeg_result,
     ffmpeg_setup_result,
     ffmpeg_not_found_result,
@@ -176,12 +178,63 @@ def query(query: str) -> ResultResponse:
     if not verify_ffmpeg_binaries():
         results.extend([ffmpeg_not_found_result()])
 
+    # Extract common info with trimmed title
+    thumbnail = str(info.get("thumbnail") or "")
+    full_title = str(info.get("title") or "Unknown Title")
+    title = full_title[:50] + "..." if len(full_title) > 50 else full_title
+
+    # Find best video (highest resolution, then highest bitrate)
+    video_formats = [f for f in formats if f.get("resolution") and f["resolution"] != "audio only"]
+    if video_formats:
+        try:
+            best_video = max(
+                video_formats,
+                key=lambda x: (
+                    tuple(map(int, x["resolution"].split("x"))) if x.get("resolution") and "x" in x["resolution"] else (0, 0),
+                    x.get("tbr") or 0,
+                ),
+            )
+            results.append(
+                best_video_result(
+                    query,
+                    thumbnail,
+                    title,
+                    best_video,
+                    d_path,
+                    pvf,
+                    paf,
+                    auto_open,
+                )
+            )
+        except (ValueError, TypeError):
+            pass  # Skip if we can't determine best video
+
+    # Find best audio (highest bitrate)
+    audio_formats = [f for f in formats if f.get("resolution") == "audio only"]
+    if audio_formats:
+        try:
+            best_audio = max(audio_formats, key=lambda x: x.get("tbr") or 0)
+            results.append(
+                best_audio_result(
+                    query,
+                    thumbnail,
+                    title,
+                    best_audio,
+                    d_path,
+                    pvf,
+                    paf,
+                    auto_open,
+                )
+            )
+        except (ValueError, TypeError):
+            pass  # Skip if we can't determine best audio
+
     results.extend(
         [
             query_result(
                 query,
-                str(info.get("thumbnail")),
-                str(info.get("title")),
+                thumbnail,
+                title,
                 format,
                 d_path,
                 pvf,
