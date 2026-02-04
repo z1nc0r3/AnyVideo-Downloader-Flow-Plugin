@@ -60,21 +60,21 @@ def update_ytdlp_result(current_version=None) -> list:
     subtitle = "Click to update yt-dlp library to the latest version."
     if current_version:
         subtitle = f"Current version: {current_version}. Click to update."
-    
+
     update_result = Result(
         Title="yt-dlp library update available!",
         SubTitle=subtitle,
         IcoPath="Images/app.png",
         JsonRPCAction={"method": "update_ytdlp_library_action", "parameters": []},
     )
-    
+
     skip_result = Result(
         Title="Skip update (use current version)",
         SubTitle="Continue using the bundled yt-dlp. Will check again in 5 days.",
         IcoPath="Images/app.png",
         JsonRPCAction={"method": "skip_ytdlp_update_action", "parameters": []},
     )
-    
+
     return [update_result, skip_result]
 
 
@@ -87,23 +87,30 @@ def ytdlp_update_in_progress_result() -> Result:
 
 
 def query_result(
-    query, thumbnail, title, format, download_path, pref_video_path, pref_audio_path, auto_open_folder=False
+    query,
+    thumbnail,
+    title,
+    format,
+    download_path,
+    pref_video_path,
+    pref_audio_path,
+    auto_open_folder=False,
 ) -> Result:
     # Build subtitle with consistent spacing
     subtitle_parts = [f"Res: {format['resolution']}"]
-    
-    if format.get('tbr') is not None:
+
+    if format.get("tbr") is not None:
         subtitle_parts.append(f"({round(format['tbr'], 2)} kbps)")
-    
-    if format.get('filesize'):
-        size_mb = round(format['filesize'] / 1024 / 1024, 2)
+
+    if format.get("filesize"):
+        size_mb = round(format["filesize"] / 1024 / 1024, 2)
         subtitle_parts.append(f"Size: {size_mb}MB")
-    
-    if format.get('fps'):
+
+    if format.get("fps"):
         subtitle_parts.append(f"FPS: {int(format['fps'])}")
-    
+
     subtitle = " ┃ ".join(subtitle_parts)
-    
+
     return Result(
         Title=title,
         SubTitle=subtitle,

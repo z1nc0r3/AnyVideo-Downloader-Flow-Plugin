@@ -77,7 +77,13 @@ def fetch_settings() -> Tuple[str, str, str, str, bool]:
         pref_audio_format = "mp3"
         auto_open_folder = False
 
-    return download_path, sorting_order, pref_video_format, pref_audio_format, auto_open_folder
+    return (
+        download_path,
+        sorting_order,
+        pref_video_format,
+        pref_audio_format,
+        auto_open_folder,
+    )
 
 
 @plugin.on_method
@@ -101,14 +107,16 @@ def query(query: str) -> ResultResponse:
         return send_results([invalid_result()])
 
     query = query.replace("https://", "http://")
-    
+
     # Check if yt-dlp library needs update before processing
     update_lock = os.path.join(LIB_PATH, ".ytdlp_updating")
-    
+
     # Check if update is in progress, but ignore stale locks
     if os.path.exists(update_lock):
         try:
-            lock_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(update_lock))
+            lock_age = datetime.now() - datetime.fromtimestamp(
+                os.path.getmtime(update_lock)
+            )
             if lock_age < timedelta(minutes=5):
                 return send_results([ytdlp_update_in_progress_result()])
             else:
@@ -120,10 +128,11 @@ def query(query: str) -> ResultResponse:
         except Exception:
             # If we can't check lock age, assume update is in progress to be safe
             return send_results([ytdlp_update_in_progress_result()])
-    
+
     if check_ytdlp_update_needed(CHECK_INTERVAL_DAYS):
         try:
             import yt_dlp
+
             current_version = yt_dlp.version.__version__
         except:
             current_version = None
@@ -161,7 +170,7 @@ def query(query: str) -> ResultResponse:
         formats = sort_by_tbr(formats)
     elif sort == "FPS":
         formats = sort_by_fps(formats)
-        
+
     results = []
 
     if not verify_ffmpeg_binaries():
@@ -237,7 +246,7 @@ def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
 @plugin.on_method
 def update_ytdlp_library_action() -> None:
     """Update the yt-dlp library when user clicks the update prompt.
-    
+
     Launches the update script in a separate terminal window.
     The script handles its own lock file management.
     """
@@ -288,7 +297,13 @@ def download(
     command = [exe_path, url, "-f", format_value]
 
     if is_audio:
-        command += ["-x", "--audio-format", pref_audio_path or "mp3", "--audio-quality", "0"]
+        command += [
+            "-x",
+            "--audio-format",
+            pref_audio_path or "mp3",
+            "--audio-quality",
+            "0",
+        ]
     else:
         if pref_video_path:
             command += ["--remux-video", pref_video_path]
@@ -333,14 +348,11 @@ def download(
 
     try:
         result = subprocess.run(command)
-        if (
-            result.returncode == 0
-            and auto_open_folder
-            and os.path.isdir(download_path)
-        ):
+        if result.returncode == 0 and auto_open_folder and os.path.isdir(download_path):
             os.startfile(download_path)
     except Exception:
         pass
+
 
 if __name__ == "__main__":
     plugin.run()

@@ -23,7 +23,7 @@ LOCK_FILE = os.path.join(LIB_PATH, ".ytdlp_updating")
 def download_ytdlp_from_pypi():
     """Download yt-dlp directly from PyPI."""
     pypi_url = "https://pypi.org/pypi/yt-dlp/json"
-    
+
     try:
         req = Request(pypi_url, headers={"User-Agent": "AnyVideo-Downloader-Plugin"})
         with urlopen(req, timeout=30) as response:
@@ -32,21 +32,21 @@ def download_ytdlp_from_pypi():
         return False, f"Network error: {e}"
     except Exception as e:
         return False, f"Failed to fetch package info: {e}"
-    
+
     # Find compatible wheel
     wheel_url = None
     for file_info in data.get("urls", []):
         if file_info.get("filename", "").endswith("-py3-none-any.whl"):
             wheel_url = file_info.get("url")
             break
-    
+
     if not wheel_url:
         return False, "No compatible wheel found on PyPI"
-    
+
     # Download wheel
     wheel_path = os.path.join(LIB_PATH, "yt_dlp_temp.whl")
     os.makedirs(LIB_PATH, exist_ok=True)
-    
+
     try:
         req = Request(wheel_url, headers={"User-Agent": "AnyVideo-Downloader-Plugin"})
         with urlopen(req, timeout=120) as response:
@@ -56,42 +56,38 @@ def download_ytdlp_from_pypi():
         if os.path.exists(wheel_path):
             os.remove(wheel_path)
         return False, f"Download failed: {e}"
-    
+
     # Install
     try:
         old_ytdlp = os.path.join(LIB_PATH, "yt_dlp")
         if os.path.exists(old_ytdlp):
             shutil.rmtree(old_ytdlp)
-        
+
         for dist_info in glob.glob(os.path.join(LIB_PATH, "yt_dlp-*.dist-info")):
             shutil.rmtree(dist_info)
-        
+
         with zipfile.ZipFile(wheel_path, "r") as zip_ref:
             zip_ref.extractall(LIB_PATH)
-        
+
         os.remove(wheel_path)
     except Exception as e:
         return False, f"Installation failed: {e}"
-    
+
     return True, data.get("info", {}).get("version", "unknown")
 
 
 def main():
-    print("Updating yt-dlp library...\n")
-    
     try:
         os.makedirs(LIB_PATH, exist_ok=True)
         with open(LOCK_FILE, "w") as f:
             f.write("updating")
     except Exception as e:
-        print(f"Error: Could not create lock file: {e}")
-        print("\nClosing in 5 seconds...")
         time.sleep(5)
         sys.exit(1)
-    
+
     try:
         success, result = download_ytdlp_from_pypi()
-        
+
         if success:
             with open(UPDATE_MARKER, "w") as f:
                 f.write("updated")
@@ -104,11 +100,9 @@ def main():
                 os.remove(LOCK_FILE)
         except Exception:
             pass
-    
-    print("\nClosing in 5 seconds...")
+
     time.sleep(5)
 
 
 if __name__ == "__main__":
     main()
-
