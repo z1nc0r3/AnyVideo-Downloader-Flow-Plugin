@@ -1,8 +1,8 @@
 import re
 import os
 import zipfile
-import subprocess
 import sys
+import subprocess
 from datetime import datetime, timedelta
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -320,12 +320,34 @@ def check_ytdlp_update_needed(check_interval_days=5):
 
 def update_ytdlp_library():
     """
-    Update the bundled yt-dlp library in the lib folder.
+    Launch the yt-dlp update script in a separate terminal window.
+    The script runs independently so FL can close without interrupting the update.
     
     Returns:
         tuple: (success: bool, message: str)
     """
     
+    update_script = os.path.join(PLUGIN_ROOT, "update_ytdlp.py")
+    
+    if not os.path.exists(update_script):
+        return False, "Update script not found"
+    
+    try:
+        # Launch script in a new console window, detached from parent process
+        creationflags = subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
+        
+        subprocess.Popen(
+            [sys.executable, update_script],
+            creationflags=creationflags,
+            close_fds=True,
+            start_new_session=True,
+        )
+        
+        return True, "Update started in separate window"
+    except Exception as e:
+        return False, f"Failed to launch updater: {str(e)}"
+
+
 def skip_ytdlp_update():
     """
     Skip the yt-dlp update check by creating/updating the marker file.
