@@ -86,6 +86,68 @@ def ytdlp_update_in_progress_result() -> Result:
     )
 
 
+def best_video_result(
+    query,
+    thumbnail,
+    format,
+    download_path,
+    pref_video_path,
+    pref_audio_path,
+    auto_open_folder=False,
+) -> Result:
+    result_title = "★ BEST VIDEO QUALITY"
+    if format.get("resolution"):
+        result_title = f"★ BEST VIDEO QUALITY [{format['resolution']}]"
+    
+    return Result(
+        Title=result_title,
+        IcoPath=thumbnail or "Images/app.png",
+        JsonRPCAction={
+            "method": "download",
+            "parameters": [
+                query,
+                f"{format['format_id']}",
+                download_path,
+                pref_video_path,
+                pref_audio_path,
+                False,
+                auto_open_folder,
+            ],
+        },
+    )
+
+
+def best_audio_result(
+    query,
+    thumbnail,
+    format,
+    download_path,
+    pref_video_path,
+    pref_audio_path,
+    auto_open_folder=False,
+) -> Result:
+    result_title = "★ BEST AUDIO ONLY"
+    if format.get("tbr"):
+        result_title = f"★ BEST AUDIO ONLY ({round(format['tbr'], 2)} kbps)"
+    
+    return Result(
+        Title=result_title,
+        IcoPath=thumbnail or "Images/app.png",
+        JsonRPCAction={
+            "method": "download",
+            "parameters": [
+                query,
+                f"{format['format_id']}",
+                download_path,
+                pref_video_path,
+                pref_audio_path,
+                True,
+                auto_open_folder,
+            ],
+        },
+    )
+
+
 def query_result(
     query,
     thumbnail,
