@@ -55,7 +55,7 @@ def ffmpeg_setup_result(issue) -> Result:
     )
 
 
-def update_ytdlp_result(current_version=None, query="") -> list:
+def update_ytdlp_result(current_version=None) -> list:
     """Returns a list of results: update option and skip option."""
     subtitle = "Click to update yt-dlp library to the latest version."
     if current_version:
@@ -72,7 +72,7 @@ def update_ytdlp_result(current_version=None, query="") -> list:
         Title="Skip update (use current version)",
         SubTitle="Continue using the bundled yt-dlp. Will check again in 5 days.",
         IcoPath="Images/app.png",
-        JsonRPCAction={"method": "skip_ytdlp_update_action", "parameters": [query]},
+        JsonRPCAction={"method": "skip_ytdlp_update_action", "parameters": []},
     )
     
     return [update_result, skip_result]

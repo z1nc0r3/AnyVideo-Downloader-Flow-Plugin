@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Tuple
 
-from pyflowlauncher import Plugin, ResultResponse, send_results, api
+from pyflowlauncher import Plugin, ResultResponse, send_results
 from pyflowlauncher.settings import settings
 from utils import (
     is_valid_url,
@@ -127,7 +127,7 @@ def query(query: str) -> ResultResponse:
             current_version = yt_dlp.version.__version__
         except:
             current_version = None
-        return send_results(update_ytdlp_result(current_version, query))
+        return send_results(update_ytdlp_result(current_version))
 
     ydl_opts = {
         "quiet": True,
@@ -245,12 +245,9 @@ def update_ytdlp_library_action() -> None:
 
 
 @plugin.on_method
-def skip_ytdlp_update_action(query: str = "") -> dict:
-    """Skip the yt-dlp update and requery to show video results."""
+def skip_ytdlp_update_action() -> None:
+    """Skip the yt-dlp update and use the current bundled version."""
     skip_ytdlp_update()
-    if query:
-        return api.change_query(f"vd {query}", requery=True)
-    return {}
 
 
 @plugin.on_method
