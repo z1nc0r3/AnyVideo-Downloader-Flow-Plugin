@@ -99,6 +99,8 @@ def main():
             if os.path.exists(LOCK_FILE):
                 os.remove(LOCK_FILE)
         except Exception:
+            # Ignore errors during lock-file cleanup; failure to remove
+            # the lock file is non-fatal and should not affect the user.
             pass
 
     time.sleep(5)
