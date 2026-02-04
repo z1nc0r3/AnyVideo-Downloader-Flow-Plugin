@@ -1,8 +1,8 @@
 import re
 import os
 import zipfile
-import subprocess
 import sys
+import subprocess
 from datetime import datetime, timedelta
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -289,22 +289,22 @@ def extract_ffmpeg():
 def check_ytdlp_update_needed(check_interval_days=5):
     """
     Check if yt-dlp library update is needed based on the last update timestamp.
-    
+
     Args:
         check_interval_days (int): Number of days between update checks.
-    
+
     Returns:
         bool: True if update is needed, False otherwise.
     """
-    
+
     # Path to yt-dlp package in lib folder
     lib_ytdlp_path = os.path.join(LIB_PATH, "yt_dlp")
     update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
-    
+
     # If yt-dlp doesn't exist in lib, update is needed
     if not os.path.exists(lib_ytdlp_path):
         return True
-    
+
     # Check the update marker file
     if os.path.exists(update_marker):
         try:
@@ -314,44 +314,56 @@ def check_ytdlp_update_needed(check_interval_days=5):
         except Exception:
             # If we can't read the marker, assume update is needed
             return True
-    
+
     return True
 
 
 def update_ytdlp_library():
     """
-    Update the bundled yt-dlp library in the lib folder.
-    
+    Launch the yt-dlp update script in a separate terminal window.
+    The script runs independently so FL can close without interrupting the update.
+
     Returns:
         tuple: (success: bool, message: str)
     """
-    
+
+    update_script = os.path.join(PLUGIN_ROOT, "update_ytdlp.py")
+
+    if not os.path.exists(update_script):
+        return False, "Update script not found"
+
+    try:
+        # Launch script in a new console window, detached from parent process
+        creationflags = (
+            subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+
+        subprocess.Popen(
+            [sys.executable, update_script],
+            creationflags=creationflags,
+            close_fds=True,
+            start_new_session=True,
+        )
+
+        return True, "Update started in separate window"
+    except Exception as e:
+        return False, f"Failed to launch updater: {str(e)}"
+
+
+def skip_ytdlp_update():
+    """
+    Skip the yt-dlp update check by creating/updating the marker file.
+    This allows users to postpone the update and use the existing bundled version.
+
+    Returns:
+        tuple: (success: bool, message: str)
+    """
     update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
-    
-    # Try different pip commands in order of preference
-    pip_commands = [
-        [sys.executable, "-m", "pip", "install", "--upgrade", "--target", LIB_PATH, "yt-dlp"],
-        ["python", "-m", "pip", "install", "--upgrade", "--target", LIB_PATH, "yt-dlp"],
-        ["pip", "install", "--upgrade", "--target", LIB_PATH, "yt-dlp"],
-    ]
-    
-    last_error = None
-    for cmd in pip_commands:
-        try:
-            subprocess.run(cmd, check=True, timeout=120)
-            
-            # Create/update the marker file
-            os.makedirs(LIB_PATH, exist_ok=True)
-            with open(update_marker, "w") as f:
-                f.write("updated")
-                
-            return True, "yt-dlp library updated successfully"
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as e:
-            last_error = e
-            continue
-    
-    # All commands failed
-    if isinstance(last_error, subprocess.TimeoutExpired):
-        return False, "Update timed out after 2 minutes"
-    else:
-        return False, f"All pip commands failed. Last error: {str(last_error)}"
+
+    try:
+        os.makedirs(LIB_PATH, exist_ok=True)
+        with open(update_marker, "w") as f:
+            f.write("skipped")
+        return True, "Update skipped. Will check again in 5 days."
+    except Exception as e:
+        return False, f"Failed to skip update: {str(e)}"
