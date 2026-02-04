@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Tuple
 
-from pyflowlauncher import Plugin, ResultResponse, send_results
+from pyflowlauncher import Plugin, ResultResponse, send_results, api
 from pyflowlauncher.settings import settings
 from utils import (
     is_valid_url,
@@ -23,6 +23,7 @@ from utils import (
     extract_ffmpeg,
     get_binaries_paths,
     check_ytdlp_update_needed,
+    skip_ytdlp_update,
     update_ytdlp_library,
 )
 from results import (
@@ -126,7 +127,7 @@ def query(query: str) -> ResultResponse:
             current_version = yt_dlp.version.__version__
         except:
             current_version = None
-        return send_results([update_ytdlp_result(current_version)])
+        return send_results(update_ytdlp_result(current_version, query))
 
     ydl_opts = {
         "quiet": True,
@@ -235,28 +236,21 @@ def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
 
 @plugin.on_method
 def update_ytdlp_library_action() -> None:
-    """Update the yt-dlp library when user clicks the update prompt."""
-    lock_path = os.path.join(LIB_PATH, ".ytdlp_updating")
+    """Update the yt-dlp library when user clicks the update prompt.
     
-    # Create lock file to prevent concurrent updates
-    try:
-        os.makedirs(LIB_PATH, exist_ok=True)
-        with open(lock_path, "w") as lock_file:
-            lock_file.write("in-progress")
-    except Exception as _:
-        return
-    
-    try:
-        update_ytdlp_library()
-    except Exception as _:
-        return
-    finally:
-        # Always remove lock file, even if update fails or is interrupted
-        try:
-            if os.path.exists(lock_path):
-                os.remove(lock_path)
-        except Exception:
-            pass
+    Launches the update script in a separate terminal window.
+    The script handles its own lock file management.
+    """
+    update_ytdlp_library()
+
+
+@plugin.on_method
+def skip_ytdlp_update_action(query: str = "") -> dict:
+    """Skip the yt-dlp update and requery to show video results."""
+    skip_ytdlp_update()
+    if query:
+        return api.change_query(f"vd {query}", requery=True)
+    return {}
 
 
 @plugin.on_method
