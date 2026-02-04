@@ -198,7 +198,6 @@ def query(query: str) -> ResultResponse:
                 best_video_result(
                     query,
                     thumbnail,
-                    title,
                     best_video,
                     d_path,
                     pvf,
@@ -218,7 +217,6 @@ def query(query: str) -> ResultResponse:
                 best_audio_result(
                     query,
                     thumbnail,
-                    title,
                     best_audio,
                     d_path,
                     pvf,

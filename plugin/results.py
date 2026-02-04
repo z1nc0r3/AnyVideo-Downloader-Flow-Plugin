@@ -89,7 +89,6 @@ def ytdlp_update_in_progress_result() -> Result:
 def best_video_result(
     query,
     thumbnail,
-    title,
     format,
     download_path,
     pref_video_path,
@@ -121,7 +120,6 @@ def best_video_result(
 def best_audio_result(
     query,
     thumbnail,
-    title,
     format,
     download_path,
     pref_video_path,
