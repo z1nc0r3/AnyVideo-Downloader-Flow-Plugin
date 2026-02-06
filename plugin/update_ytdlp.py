@@ -113,9 +113,9 @@ def main():
         lib_success, lib_result = download_ytdlp_from_pypi()
 
         if lib_success:
-            print(f"Library updated to version {lib_result}")
+            print(f"Library: Updated to version {lib_result}")
         else:
-            print(f"Library update failed: {lib_result}")
+            print(f"Library: Update failed: {lib_result}")
 
         # Update yt-dlp binary using self-update
         bin_success, bin_result = update_ytdlp_binary()
