@@ -38,13 +38,13 @@ from results import (
     ffmpeg_setup_result,
     ffmpeg_not_found_result,
     update_ytdlp_result,
+    setup_all_result,
     ytdlp_update_in_progress_result,
 )
 from ytdlp import CustomYoutubeDL
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
-EXE_PATH = os.path.join(PLUGIN_ROOT, "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 5
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 
@@ -92,15 +92,26 @@ def fetch_settings() -> Tuple[str, str, str, str, bool]:
 def query(query: str) -> ResultResponse:
     d_path, sort, pvf, paf, auto_open = fetch_settings()
 
+    ffmpeg_needed = False
     verified, verify_reason = verify_ffmpeg()
     if not verified:
         if verify_reason and "setup in progress" in verify_reason.lower():
             return send_results([ffmpeg_setup_result(verify_reason)])
-        return send_results([download_ffmpeg_result(PLUGIN_ROOT, verify_reason)])
+        ffmpeg_needed = True
+    else:
+        extracted, extract_reason = extract_ffmpeg()
+        if not extracted:
+            ffmpeg_needed = True
+            verify_reason = extract_reason
 
-    extracted, extract_reason = extract_ffmpeg()
-    if not extracted:
-        return send_results([download_ffmpeg_result(PLUGIN_ROOT, extract_reason)])
+    ytdlp_needed = check_ytdlp_update_needed(CHECK_INTERVAL_DAYS)
+
+    # Combine ffmpeg + yt-dlp setup into a single prompt when both are needed
+    if ffmpeg_needed and ytdlp_needed:
+        return send_results([setup_all_result(PLUGIN_ROOT, verify_reason)])
+
+    if ffmpeg_needed:
+        return send_results([download_ffmpeg_result(PLUGIN_ROOT, verify_reason)])
 
     if not query.strip():
         return send_results([init_results(d_path)])
@@ -131,7 +142,7 @@ def query(query: str) -> ResultResponse:
             # If we can't check lock age, assume update is in progress to be safe
             return send_results([ytdlp_update_in_progress_result()])
 
-    if check_ytdlp_update_needed(CHECK_INTERVAL_DAYS):
+    if ytdlp_needed:
         try:
             import yt_dlp
 
@@ -311,6 +322,17 @@ def skip_ytdlp_update_action() -> None:
 
 
 @plugin.on_method
+def setup_all_action(PLUGIN_ROOT) -> None:
+    """Download FFmpeg binaries and update yt-dlp in one step.
+
+    This is triggered on first install when both dependencies are missing,
+    reducing the number of user prompts from multiple to one.
+    """
+    download_ffmpeg_binaries(PLUGIN_ROOT)
+    update_ytdlp_library()
+
+
+@plugin.on_method
 def download(
     url: str,
     format_id: str,
@@ -320,11 +342,6 @@ def download(
     is_audio: bool,
     auto_open_folder: bool = False,
 ) -> None:
-    try:
-        last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
-    except Exception:
-        last_modified_time = None
-
     exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
     ffmpeg_path = get_binaries_paths() or ""
 
@@ -383,17 +400,6 @@ def download(
 
     if ffmpeg_path:
         command += ["--ffmpeg-location", ffmpeg_path]
-
-    update_flag = ""
-    if last_modified_time is not None:
-        if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS):
-            update_flag = "-U"
-    else:
-        # If we couldn't determine last modified time (exe missing), try updating
-        update_flag = "-U"
-
-    if update_flag:
-        command.append(update_flag)
 
     command = [arg for arg in command if arg is not None and arg != ""]
 

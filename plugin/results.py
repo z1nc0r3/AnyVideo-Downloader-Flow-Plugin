@@ -55,6 +55,19 @@ def ffmpeg_setup_result(issue) -> Result:
     )
 
 
+def setup_all_result(dest_path, issue=None) -> Result:
+    subtitle = "Click to download FFmpeg and update yt-dlp in one step."
+    title = "Initial setup required!"
+    if issue:
+        subtitle = f"{issue} Click to set up all dependencies."
+    return Result(
+        Title=title,
+        SubTitle=subtitle,
+        IcoPath="Images/error.png",
+        JsonRPCAction={"method": "setup_all_action", "parameters": [dest_path]},
+    )
+
+
 def update_ytdlp_result(current_version=None) -> list:
     """Returns a list of results: update option and skip option."""
     subtitle = "Click to update yt-dlp library to the latest version."
