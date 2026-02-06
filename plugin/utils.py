@@ -367,3 +367,41 @@ def skip_ytdlp_update():
         return True, "Update skipped. Will check again in 5 days."
     except Exception as e:
         return False, f"Failed to skip update: {str(e)}"
+
+
+def start_background_ffmpeg_download(plugin_root):
+    """
+    Start the FFmpeg download in a background process without user interaction.
+    Creates a lock file and launches the download script independently.
+
+    Args:
+        plugin_root (str): Path to the plugin root directory.
+
+    Returns:
+        bool: True if the background download was started successfully.
+    """
+    download_script = os.path.join(plugin_root, "download_ffmpeg.py")
+
+    if not os.path.exists(download_script):
+        return False
+
+    lock_path = os.path.join(plugin_root, "ffmpeg_setup.lock")
+    if os.path.exists(lock_path):
+        return True  # Already in progress
+
+    try:
+        creationflags = (
+            getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+
+        subprocess.Popen(
+            [sys.executable, download_script],
+            creationflags=creationflags,
+            close_fds=True,
+            start_new_session=True,
+        )
+
+        return True
+    except Exception:
+        return False

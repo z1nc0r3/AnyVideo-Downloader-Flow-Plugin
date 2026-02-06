@@ -25,6 +25,7 @@ from utils import (
     check_ytdlp_update_needed,
     skip_ytdlp_update,
     update_ytdlp_library,
+    start_background_ffmpeg_download,
 )
 from results import (
     init_results,
@@ -44,7 +45,6 @@ from ytdlp import CustomYoutubeDL
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
-EXE_PATH = os.path.join(PLUGIN_ROOT, "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 5
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 
@@ -96,6 +96,10 @@ def query(query: str) -> ResultResponse:
     if not verified:
         if verify_reason and "setup in progress" in verify_reason.lower():
             return send_results([ffmpeg_setup_result(verify_reason)])
+        # Auto-trigger ffmpeg download in the background
+        started = start_background_ffmpeg_download(PLUGIN_ROOT)
+        if started:
+            return send_results([ffmpeg_setup_result("Downloading FFmpeg binaries. Please wait a moment and try again.")])
         return send_results([download_ffmpeg_result(PLUGIN_ROOT, verify_reason)])
 
     extracted, extract_reason = extract_ffmpeg()
@@ -320,11 +324,6 @@ def download(
     is_audio: bool,
     auto_open_folder: bool = False,
 ) -> None:
-    try:
-        last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
-    except Exception:
-        last_modified_time = None
-
     exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
     ffmpeg_path = get_binaries_paths() or ""
 
@@ -383,17 +382,6 @@ def download(
 
     if ffmpeg_path:
         command += ["--ffmpeg-location", ffmpeg_path]
-
-    update_flag = ""
-    if last_modified_time is not None:
-        if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS):
-            update_flag = "-U"
-    else:
-        # If we couldn't determine last modified time (exe missing), try updating
-        update_flag = "-U"
-
-    if update_flag:
-        command.append(update_flag)
 
     command = [arg for arg in command if arg is not None and arg != ""]
 
