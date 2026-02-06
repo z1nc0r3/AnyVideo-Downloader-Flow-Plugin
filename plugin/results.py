@@ -47,11 +47,11 @@ def download_ffmpeg_result(dest_path, issue=None) -> Result:
     )
 
 
-def ffmpeg_setup_result(issue) -> Result:
+def ffmpeg_setup_result(issue=None) -> Result:
     return Result(
         Title="FFmpeg setup in progress...",
-        SubTitle=issue or "Please wait a few seconds and try again.",
-        IcoPath="Images/error.png",
+        SubTitle=issue or "Downloading in the background. You can continue using the plugin.",
+        IcoPath="Images/app.png",
     )
 
 
@@ -80,8 +80,8 @@ def update_ytdlp_result(current_version=None) -> list:
 
 def ytdlp_update_in_progress_result() -> Result:
     return Result(
-        Title="yt-dlp update in progress...",
-        SubTitle="Please wait a moment and try again.",
+        Title="yt-dlp is being updated in the background...",
+        SubTitle="You can continue using the plugin. The update will complete shortly.",
         IcoPath="Images/app.png",
     )
 

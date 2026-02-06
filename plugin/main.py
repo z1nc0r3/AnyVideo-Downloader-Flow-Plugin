@@ -34,17 +34,14 @@ from results import (
     query_result,
     best_video_result,
     best_audio_result,
-    download_ffmpeg_result,
     ffmpeg_setup_result,
     ffmpeg_not_found_result,
-    update_ytdlp_result,
     ytdlp_update_in_progress_result,
 )
 from ytdlp import CustomYoutubeDL
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
-EXE_PATH = os.path.join(PLUGIN_ROOT, "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 5
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 
@@ -92,25 +89,38 @@ def fetch_settings() -> Tuple[str, str, str, str, bool]:
 def query(query: str) -> ResultResponse:
     d_path, sort, pvf, paf, auto_open = fetch_settings()
 
+    # --- FFmpeg: auto-download in background if missing ---
+    ffmpeg_ready = True
+    ffmpeg_status = None
     verified, verify_reason = verify_ffmpeg()
     if not verified:
+        ffmpeg_ready = False
         if verify_reason and "setup in progress" in verify_reason.lower():
-            return send_results([ffmpeg_setup_result(verify_reason)])
-        return send_results([download_ffmpeg_result(PLUGIN_ROOT, verify_reason)])
-
-    extracted, extract_reason = extract_ffmpeg()
-    if not extracted:
-        return send_results([download_ffmpeg_result(PLUGIN_ROOT, extract_reason)])
+            # Download already running – just inform the user
+            ffmpeg_status = verify_reason
+        else:
+            # Auto-trigger ffmpeg download in the background
+            _download_ffmpeg_background(PLUGIN_ROOT)
+    else:
+        extracted, extract_reason = extract_ffmpeg()
+        if not extracted:
+            ffmpeg_ready = False
+            # Auto-trigger download again if extraction failed
+            _download_ffmpeg_background(PLUGIN_ROOT)
 
     if not query.strip():
-        return send_results([init_results(d_path)])
+        results = [init_results(d_path)]
+        if not ffmpeg_ready:
+            results.insert(0, ffmpeg_setup_result(ffmpeg_status))
+        return send_results(results)
 
     if not is_valid_url(query):
         return send_results([invalid_result()])
 
     query = query.replace("https://", "http://")
 
-    # Check if yt-dlp library needs update before processing
+    # --- yt-dlp: auto-update in background if needed ---
+    ytdlp_updating = False
     update_lock = os.path.join(LIB_PATH, ".ytdlp_updating")
 
     # Check if update is in progress, but ignore stale locks
@@ -120,7 +130,7 @@ def query(query: str) -> ResultResponse:
                 os.path.getmtime(update_lock)
             )
             if lock_age < timedelta(minutes=5):
-                return send_results([ytdlp_update_in_progress_result()])
+                ytdlp_updating = True
             else:
                 try:
                     os.remove(update_lock)
@@ -128,17 +138,12 @@ def query(query: str) -> ResultResponse:
                     # Best-effort cleanup of stale update lock; ignore failures as they are non-fatal.
                     pass
         except Exception:
-            # If we can't check lock age, assume update is in progress to be safe
-            return send_results([ytdlp_update_in_progress_result()])
+            ytdlp_updating = True
 
-    if check_ytdlp_update_needed(CHECK_INTERVAL_DAYS):
-        try:
-            import yt_dlp
-
-            current_version = yt_dlp.version.__version__
-        except:
-            current_version = None
-        return send_results(update_ytdlp_result(current_version))
+    if not ytdlp_updating and check_ytdlp_update_needed(CHECK_INTERVAL_DAYS):
+        # Auto-trigger update in the background instead of blocking the user
+        update_ytdlp_library()
+        ytdlp_updating = True
 
     ydl_opts = {
         "quiet": True,
@@ -174,6 +179,9 @@ def query(query: str) -> ResultResponse:
         formats = sort_by_fps(formats)
 
     results = []
+
+    if ytdlp_updating:
+        results.append(ytdlp_update_in_progress_result())
 
     if not verify_ffmpeg_binaries():
         results.extend([ffmpeg_not_found_result()])
@@ -243,6 +251,68 @@ def query(query: str) -> ResultResponse:
         ]
     )
     return send_results(results)
+
+
+def _download_ffmpeg_background(plugin_root) -> None:
+    """Download and extract FFmpeg binaries in a background thread."""
+    import threading
+
+    lock_path = os.path.join(plugin_root, "ffmpeg_setup.lock")
+
+    # Don't start another download if one is already in progress
+    if os.path.exists(lock_path):
+        return
+
+    def _do_download():
+        BIN_URL = (
+            "https://github.com/z1nc0r3/ffmpeg-binaries/blob/main/ffmpeg-bin.zip?raw=true"
+        )
+        FFMPEG_ZIP = os.path.join(plugin_root, "ffmpeg.zip")
+
+        # Create a lock to indicate setup is in progress so queries can avoid re-triggering.
+        try:
+            with open(lock_path, "w", encoding="utf-8") as lock_file:
+                lock_file.write("in-progress")
+        except Exception:
+            pass
+
+        try:
+            try:
+                subprocess.run(
+                    ["curl", "-L", BIN_URL, "-o", FFMPEG_ZIP],
+                    check=True,
+                )
+            except Exception:
+                try:
+                    subprocess.run(
+                        f'curl -L "{BIN_URL}" -o "{FFMPEG_ZIP}"',
+                        shell=True,
+                        check=True,
+                    )
+                except Exception:
+                    pass
+
+            if not os.path.exists(FFMPEG_ZIP):
+                return
+
+            zip_ok, _ = verify_ffmpeg_zip(return_reason=True)
+            if not zip_ok:
+                try:
+                    os.remove(FFMPEG_ZIP)
+                except Exception:
+                    pass
+                return
+
+            extract_ffmpeg()
+        finally:
+            try:
+                if os.path.exists(lock_path):
+                    os.remove(lock_path)
+            except Exception:
+                pass
+
+    thread = threading.Thread(target=_do_download, daemon=True)
+    thread.start()
 
 
 @plugin.on_method
@@ -320,11 +390,6 @@ def download(
     is_audio: bool,
     auto_open_folder: bool = False,
 ) -> None:
-    try:
-        last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
-    except Exception:
-        last_modified_time = None
-
     exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
     ffmpeg_path = get_binaries_paths() or ""
 
@@ -383,17 +448,6 @@ def download(
 
     if ffmpeg_path:
         command += ["--ffmpeg-location", ffmpeg_path]
-
-    update_flag = ""
-    if last_modified_time is not None:
-        if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS):
-            update_flag = "-U"
-    else:
-        # If we couldn't determine last modified time (exe missing), try updating
-        update_flag = "-U"
-
-    if update_flag:
-        command.append(update_flag)
 
     command = [arg for arg in command if arg is not None and arg != ""]
 
