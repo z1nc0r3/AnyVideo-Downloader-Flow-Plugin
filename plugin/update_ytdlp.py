@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Standalone script to update yt-dlp library from PyPI.
+Standalone script to update yt-dlp library from PyPI and yt-dlp binary.
 Runs in its own terminal window, independent of Flow Launcher.
 """
 
@@ -10,6 +10,7 @@ import json
 import shutil
 import glob
 import zipfile
+import subprocess
 import time
 from urllib.request import urlopen, Request
 from urllib.error import URLError
@@ -18,6 +19,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "lib"))
 UPDATE_MARKER = os.path.join(LIB_PATH, ".ytdlp_last_update")
 LOCK_FILE = os.path.join(LIB_PATH, ".ytdlp_updating")
+EXE_PATH = os.path.join(SCRIPT_DIR, "yt-dlp.exe")
 
 
 def download_ytdlp_from_pypi():
@@ -76,6 +78,20 @@ def download_ytdlp_from_pypi():
     return True, data.get("info", {}).get("version", "unknown")
 
 
+def update_ytdlp_binary():
+    """Update the yt-dlp binary using its built-in -U flag."""
+    if not os.path.exists(EXE_PATH):
+        return
+
+    try:
+        subprocess.run(
+            [EXE_PATH, "-U"],
+            timeout=120,
+        )
+    except Exception:
+        pass
+
+
 def main():
     try:
         os.makedirs(LIB_PATH, exist_ok=True)
@@ -91,9 +107,9 @@ def main():
         if success:
             with open(UPDATE_MARKER, "w") as f:
                 f.write("updated")
-            print(f"Success! Updated to version {result}")
+            print(f"Success! Updated yt-dlp library to version {result}")
         else:
-            print(f"Update failed: {result}")
+            print(f"Library update failed: {result}")
     finally:
         try:
             if os.path.exists(LOCK_FILE):
@@ -102,6 +118,10 @@ def main():
             # Ignore errors during lock-file cleanup; failure to remove
             # the lock file is non-fatal and should not affect the user.
             pass
+
+    # Update the yt-dlp binary (non-blocking, doesn't affect library usage)
+    print("Updating yt-dlp binary...")
+    update_ytdlp_binary()
 
     time.sleep(5)
 
