@@ -24,12 +24,7 @@ def download_and_extract():
             check=True,
         )
     except Exception:
-        try:
-            subprocess.run(
-                f'curl -L "{BIN_URL}" -o "{FFMPEG_ZIP}"', shell=True, check=True
-            )
-        except Exception:
-            return False
+        return False
 
     if not os.path.exists(FFMPEG_ZIP):
         return False

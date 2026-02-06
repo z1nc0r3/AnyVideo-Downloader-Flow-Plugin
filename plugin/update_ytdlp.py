@@ -84,10 +84,14 @@ def update_ytdlp_binary():
         return
 
     try:
-        subprocess.run(
+        result = subprocess.run(
             [EXE_PATH, "-U"],
             timeout=120,
+            capture_output=True,
+            text=True,
         )
+        if result.stdout:
+            print(result.stdout.strip())
     except Exception:
         pass
 
