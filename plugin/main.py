@@ -19,12 +19,12 @@ from utils import (
     sort_by_size,
     verify_ffmpeg_binaries,
     verify_ffmpeg,
-    verify_ffmpeg_zip,
     extract_ffmpeg,
     get_binaries_paths,
     check_ytdlp_update_needed,
     skip_ytdlp_update,
     update_ytdlp_library,
+    launch_plugin_setup,
 )
 from results import (
     init_results,
@@ -34,17 +34,16 @@ from results import (
     query_result,
     best_video_result,
     best_audio_result,
-    download_ffmpeg_result,
     ffmpeg_setup_result,
     ffmpeg_not_found_result,
     update_ytdlp_result,
     ytdlp_update_in_progress_result,
+    plugin_setup_in_progress_result,
 )
 from ytdlp import CustomYoutubeDL
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
-EXE_PATH = os.path.join(PLUGIN_ROOT, "yt-dlp.exe")
 CHECK_INTERVAL_DAYS = 5
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 
@@ -92,15 +91,34 @@ def fetch_settings() -> Tuple[str, str, str, str, bool]:
 def query(query: str) -> ResultResponse:
     d_path, sort, pvf, paf, auto_open = fetch_settings()
 
+    # Check if combined plugin setup is in progress
+    plugin_setup_lock = os.path.join(PLUGIN_ROOT, "plugin_setup.lock")
+    if os.path.exists(plugin_setup_lock):
+        try:
+            lock_age = datetime.now() - datetime.fromtimestamp(
+                os.path.getmtime(plugin_setup_lock)
+            )
+            if lock_age < timedelta(minutes=10):
+                return send_results([plugin_setup_in_progress_result()])
+            else:
+                try:
+                    os.remove(plugin_setup_lock)
+                except Exception:
+                    pass
+        except Exception:
+            return send_results([plugin_setup_in_progress_result()])
+
     verified, verify_reason = verify_ffmpeg()
     if not verified:
         if verify_reason and "setup in progress" in verify_reason.lower():
             return send_results([ffmpeg_setup_result(verify_reason)])
-        return send_results([download_ffmpeg_result(PLUGIN_ROOT, verify_reason)])
+        launch_plugin_setup()
+        return send_results([plugin_setup_in_progress_result()])
 
     extracted, extract_reason = extract_ffmpeg()
     if not extracted:
-        return send_results([download_ffmpeg_result(PLUGIN_ROOT, extract_reason)])
+        launch_plugin_setup()
+        return send_results([plugin_setup_in_progress_result()])
 
     if not query.strip():
         return send_results([init_results(d_path)])

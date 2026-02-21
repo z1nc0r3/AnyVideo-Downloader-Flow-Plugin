@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
 FFMPEG_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
+PLUGIN_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "plugin_setup.lock")
 URL_REGEX = (
     "((http|https)://)(www.)?"
     + "[a-zA-Z0-9@:%._\\+~#?&//=]"
@@ -367,3 +368,45 @@ def skip_ytdlp_update():
         return True, "Update skipped. Will check again in 5 days."
     except Exception as e:
         return False, f"Failed to skip update: {str(e)}"
+
+
+def launch_plugin_setup():
+    """
+    Launch the combined plugin setup script in a visible terminal window.
+    Creates the lock file BEFORE spawning to prevent race conditions.
+
+    Returns:
+        tuple: (success: bool, message: str)
+    """
+    setup_script = os.path.join(PLUGIN_ROOT, "setup_plugin.py")
+
+    if not os.path.exists(setup_script):
+        return False, "Setup script not found"
+
+    # Create lock before spawning to prevent duplicate launches
+    try:
+        with open(PLUGIN_SETUP_LOCK, "w", encoding="utf-8") as f:
+            f.write("in-progress")
+    except Exception:
+        pass
+
+    try:
+        creationflags = (
+            subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+
+        subprocess.Popen(
+            [sys.executable, setup_script],
+            creationflags=creationflags,
+            close_fds=True,
+            start_new_session=True,
+        )
+
+        return True, "Setup started in separate window"
+    except Exception as e:
+        try:
+            if os.path.exists(PLUGIN_SETUP_LOCK):
+                os.remove(PLUGIN_SETUP_LOCK)
+        except Exception:
+            pass
+        return False, f"Failed to launch setup: {str(e)}"
