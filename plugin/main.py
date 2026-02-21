@@ -246,55 +246,6 @@ def query(query: str) -> ResultResponse:
 
 
 @plugin.on_method
-def download_ffmpeg_binaries(PLUGIN_ROOT) -> None:
-    BIN_URL = (
-        "https://github.com/z1nc0r3/ffmpeg-binaries/blob/main/ffmpeg-bin.zip?raw=true"
-    )
-    FFMPEG_ZIP = os.path.join(PLUGIN_ROOT, "ffmpeg.zip")
-    lock_path = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
-
-    # Create a lock to indicate setup is in progress so queries can avoid re-triggering.
-    try:
-        with open(lock_path, "w", encoding="utf-8") as lock_file:
-            lock_file.write("in-progress")
-    except Exception:
-        pass
-
-    try:
-        try:
-            subprocess.run(
-                ["curl", "-L", BIN_URL, "-o", FFMPEG_ZIP],
-                check=True,
-            )
-        except Exception:
-            try:
-                subprocess.run(
-                    f'curl -L "{BIN_URL}" -o "{FFMPEG_ZIP}"', shell=True, check=True
-                )
-            except Exception:
-                pass
-
-        if not os.path.exists(FFMPEG_ZIP):
-            return
-
-        zip_ok, _ = verify_ffmpeg_zip(return_reason=True)
-        if not zip_ok:
-            try:
-                os.remove(FFMPEG_ZIP)
-            except Exception:
-                pass
-            return
-
-        extract_ffmpeg()
-    finally:
-        try:
-            if os.path.exists(lock_path):
-                os.remove(lock_path)
-        except Exception:
-            pass
-
-
-@plugin.on_method
 def update_ytdlp_library_action() -> None:
     """Update the yt-dlp library when user clicks the update prompt.
 
@@ -320,11 +271,6 @@ def download(
     is_audio: bool,
     auto_open_folder: bool = False,
 ) -> None:
-    try:
-        last_modified_time = datetime.fromtimestamp(os.path.getmtime(EXE_PATH))
-    except Exception:
-        last_modified_time = None
-
     exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
     ffmpeg_path = get_binaries_paths() or ""
 
@@ -384,16 +330,7 @@ def download(
     if ffmpeg_path:
         command += ["--ffmpeg-location", ffmpeg_path]
 
-    update_flag = ""
-    if last_modified_time is not None:
-        if datetime.now() - last_modified_time >= timedelta(days=CHECK_INTERVAL_DAYS):
-            update_flag = "-U"
-    else:
-        # If we couldn't determine last modified time (exe missing), try updating
-        update_flag = "-U"
-
-    if update_flag:
-        command.append(update_flag)
+    command.append("-U")
 
     command = [arg for arg in command if arg is not None and arg != ""]
 
