@@ -159,6 +159,9 @@ def query(query: str) -> ResultResponse:
     ydl = CustomYoutubeDL(params=ydl_opts)
     info = ydl.extract_info(query)
 
+    if info is None:
+        return send_results([error_result()])
+
     formats = [
         {
             "format_id": format.get("format_id"),
@@ -184,8 +187,6 @@ def query(query: str) -> ResultResponse:
         formats = sort_by_tbr(formats)
     elif sort == "FPS":
         formats = sort_by_fps(formats)
-
-    needs_update = check_ytdlp_version(CHECK_INTERVAL_DAYS)
 
     results = []
 
@@ -217,7 +218,6 @@ def query(query: str) -> ResultResponse:
                     pvf,
                     paf,
                     auto_open,
-                    needs_update,
                 )
             )
         except (ValueError, TypeError):
@@ -237,7 +237,6 @@ def query(query: str) -> ResultResponse:
                     pvf,
                     paf,
                     auto_open,
-                    needs_update,
                 )
             )
         except (ValueError, TypeError):
@@ -254,7 +253,6 @@ def query(query: str) -> ResultResponse:
                 pvf,
                 paf,
                 auto_open,
-                needs_update,
             )
             for format in formats
         ]
@@ -271,9 +269,8 @@ def download(
     pref_audio_path: str,
     is_audio: bool,
     auto_open_folder: bool = False,
-    needs_update: bool = False,
 ) -> None:
-    if needs_update:
+    if check_ytdlp_version(CHECK_INTERVAL_DAYS):
         update_ytdlp_library()
 
     exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
