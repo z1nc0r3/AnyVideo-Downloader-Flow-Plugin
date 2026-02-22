@@ -21,8 +21,7 @@ from utils import (
     verify_ffmpeg,
     extract_ffmpeg,
     get_binaries_paths,
-    check_ytdlp_update_needed,
-    skip_ytdlp_update,
+    check_ytdlp_version,
     update_ytdlp_library,
     launch_plugin_setup,
 )
@@ -36,15 +35,18 @@ from results import (
     best_audio_result,
     ffmpeg_setup_result,
     ffmpeg_not_found_result,
-    update_ytdlp_result,
-    ytdlp_update_in_progress_result,
     plugin_setup_in_progress_result,
+    ytdlp_update_in_progress_result,
 )
-from ytdlp import CustomYoutubeDL
+try:
+    from ytdlp import CustomYoutubeDL
+    YTDLP_AVAILABLE = True
+except ImportError:
+    CustomYoutubeDL = None
+    YTDLP_AVAILABLE = False
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
-LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
-CHECK_INTERVAL_DAYS = 5
+CHECK_INTERVAL_DAYS = 7
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 
 plugin = Plugin()
@@ -120,6 +122,9 @@ def query(query: str) -> ResultResponse:
         launch_plugin_setup()
         return send_results([plugin_setup_in_progress_result()])
 
+    if not YTDLP_AVAILABLE:
+        return send_results([ytdlp_update_in_progress_result()])
+
     if not query.strip():
         return send_results([init_results(d_path)])
 
@@ -127,36 +132,6 @@ def query(query: str) -> ResultResponse:
         return send_results([invalid_result()])
 
     query = query.replace("https://", "http://")
-
-    # Check if yt-dlp library needs update before processing
-    update_lock = os.path.join(LIB_PATH, ".ytdlp_updating")
-
-    # Check if update is in progress, but ignore stale locks
-    if os.path.exists(update_lock):
-        try:
-            lock_age = datetime.now() - datetime.fromtimestamp(
-                os.path.getmtime(update_lock)
-            )
-            if lock_age < timedelta(minutes=5):
-                return send_results([ytdlp_update_in_progress_result()])
-            else:
-                try:
-                    os.remove(update_lock)
-                except Exception:
-                    # Best-effort cleanup of stale update lock; ignore failures as they are non-fatal.
-                    pass
-        except Exception:
-            # If we can't check lock age, assume update is in progress to be safe
-            return send_results([ytdlp_update_in_progress_result()])
-
-    if check_ytdlp_update_needed(CHECK_INTERVAL_DAYS):
-        try:
-            import yt_dlp
-
-            current_version = yt_dlp.version.__version__
-        except:
-            current_version = None
-        return send_results(update_ytdlp_result(current_version))
 
     ydl_opts = {
         "quiet": True,
@@ -191,6 +166,8 @@ def query(query: str) -> ResultResponse:
     elif sort == "FPS":
         formats = sort_by_fps(formats)
 
+    needs_update = check_ytdlp_version(CHECK_INTERVAL_DAYS)
+
     results = []
 
     if not verify_ffmpeg_binaries():
@@ -221,6 +198,7 @@ def query(query: str) -> ResultResponse:
                     pvf,
                     paf,
                     auto_open,
+                    needs_update,
                 )
             )
         except (ValueError, TypeError):
@@ -240,6 +218,7 @@ def query(query: str) -> ResultResponse:
                     pvf,
                     paf,
                     auto_open,
+                    needs_update,
                 )
             )
         except (ValueError, TypeError):
@@ -256,27 +235,12 @@ def query(query: str) -> ResultResponse:
                 pvf,
                 paf,
                 auto_open,
+                needs_update,
             )
             for format in formats
         ]
     )
     return send_results(results)
-
-
-@plugin.on_method
-def update_ytdlp_library_action() -> None:
-    """Update the yt-dlp library when user clicks the update prompt.
-
-    Launches the update script in a separate terminal window.
-    The script handles its own lock file management.
-    """
-    update_ytdlp_library()
-
-
-@plugin.on_method
-def skip_ytdlp_update_action() -> None:
-    """Skip the yt-dlp update and use the current bundled version."""
-    skip_ytdlp_update()
 
 
 @plugin.on_method
@@ -288,7 +252,11 @@ def download(
     pref_audio_path: str,
     is_audio: bool,
     auto_open_folder: bool = False,
+    needs_update: bool = False,
 ) -> None:
+    if needs_update:
+        update_ytdlp_library()
+
     exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
     ffmpeg_path = get_binaries_paths() or ""
 
