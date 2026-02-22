@@ -154,6 +154,7 @@ def query(query: str) -> ResultResponse:
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
+        "socket_timeout": 30,
     }
     ydl = CustomYoutubeDL(params=ydl_opts)
     info = ydl.extract_info(query)
