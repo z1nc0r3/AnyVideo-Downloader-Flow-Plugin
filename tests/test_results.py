@@ -1,7 +1,5 @@
 """Tests for plugin/results.py"""
 
-import pytest
-
 from results import (
     init_results,
     invalid_result,

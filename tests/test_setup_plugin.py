@@ -1,6 +1,5 @@
 """Tests for plugin/setup_plugin.py"""
 
-import sys
 import zipfile
 from unittest.mock import MagicMock, call, mock_open, patch
 

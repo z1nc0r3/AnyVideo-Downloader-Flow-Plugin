@@ -5,8 +5,6 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from unittest.mock import MagicMock, mock_open, patch
 
-import pytest
-
 import utils
 
 
