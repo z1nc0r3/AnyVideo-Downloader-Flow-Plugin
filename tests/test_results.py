@@ -105,8 +105,7 @@ class TestBestVideoResult:
     def test_json_rpc_action_parameters(self):
         fmt = self._make_format()
         r = best_video_result("http://example.com", "thumb.jpg", fmt,
-                              "/downloads", "mp4", "mp3", auto_open_folder=True,
-                              needs_update=True)
+                              "/downloads", "mp4", "mp3", auto_open_folder=True)
         params = r.JsonRPCAction["parameters"]
         assert params[0] == "http://example.com"
         assert params[1] == "137"
@@ -115,14 +114,6 @@ class TestBestVideoResult:
         assert params[4] == "mp3"
         assert params[5] is False  # is_audio
         assert params[6] is True   # auto_open_folder
-        assert params[7] is True   # needs_update
-
-    def test_needs_update_false_by_default(self):
-        fmt = self._make_format()
-        r = best_video_result("http://example.com", None, fmt,
-                              "/downloads", "mp4", "mp3")
-        params = r.JsonRPCAction["parameters"]
-        assert params[7] is False
 
     def test_thumbnail_fallback(self):
         fmt = self._make_format()
@@ -157,13 +148,6 @@ class TestBestAudioResult:
                               "/downloads", "mp4", "mp3")
         params = r.JsonRPCAction["parameters"]
         assert params[5] is True  # is_audio
-
-    def test_needs_update_propagation(self):
-        fmt = {"format_id": "140", "tbr": 128}
-        r = best_audio_result("http://example.com", None, fmt,
-                              "/downloads", "mp4", "mp3", needs_update=True)
-        params = r.JsonRPCAction["parameters"]
-        assert params[7] is True
 
 
 class TestQueryResult:
@@ -210,13 +194,6 @@ class TestQueryResult:
                          "/downloads", "mp4", "mp3")
         params = r.JsonRPCAction["parameters"]
         assert params[5] is False  # is_audio
-
-    def test_needs_update_in_params(self):
-        fmt = self._make_format()
-        r = query_result("http://example.com", None, "Test Video", fmt,
-                         "/downloads", "mp4", "mp3", needs_update=True)
-        params = r.JsonRPCAction["parameters"]
-        assert params[7] is True
 
     def test_title_pass_through(self):
         fmt = self._make_format()
