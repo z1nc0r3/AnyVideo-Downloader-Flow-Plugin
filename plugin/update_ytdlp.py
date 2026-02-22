@@ -86,14 +86,12 @@ def main():
         sys.exit(1)
 
     try:
-        success, result = download_ytdlp_from_pypi()
+        success, _ = download_ytdlp_from_pypi()
 
         if success:
             with open(UPDATE_MARKER, "w") as f:
                 f.write("updated")
-            print(f"Success! Updated to version {result}")
-        else:
-            print(f"Update failed: {result}")
+
     finally:
         try:
             if os.path.exists(LOCK_FILE):

@@ -1,13 +1,16 @@
 import re
 import os
+import json
 import zipfile
 import sys
 import subprocess
 from datetime import datetime, timedelta
+from urllib.request import urlopen, Request
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
 FFMPEG_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
+PLUGIN_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "plugin_setup.lock")
 URL_REGEX = (
     "((http|https)://)(www.)?"
     + "[a-zA-Z0-9@:%._\\+~#?&//=]"
@@ -286,36 +289,50 @@ def extract_ffmpeg():
     return True, None
 
 
-def check_ytdlp_update_needed(check_interval_days=5):
+def check_ytdlp_version(check_interval_days=7):
     """
-    Check if yt-dlp library update is needed based on the last update timestamp.
-
-    Args:
-        check_interval_days (int): Number of days between update checks.
+    Check if yt-dlp library needs updating by comparing installed version with PyPI.
+    Only checks PyPI if the last check was more than check_interval_days ago.
 
     Returns:
-        bool: True if update is needed, False otherwise.
+        bool: True if update is available, False otherwise (including on errors).
     """
-
-    # Path to yt-dlp package in lib folder
-    lib_ytdlp_path = os.path.join(LIB_PATH, "yt_dlp")
     update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
+    update_lock = os.path.join(LIB_PATH, ".ytdlp_updating")
 
-    # If yt-dlp doesn't exist in lib, update is needed
-    if not os.path.exists(lib_ytdlp_path):
-        return True
-
-    # Check the update marker file
-    if os.path.exists(update_marker):
-        try:
-            last_update = datetime.fromtimestamp(os.path.getmtime(update_marker))
-            if datetime.now() - last_update < timedelta(days=check_interval_days):
+    try:
+        # Skip if marker is fresh (checked recently)
+        if os.path.exists(update_marker):
+            last_check = datetime.fromtimestamp(os.path.getmtime(update_marker))
+            if datetime.now() - last_check < timedelta(days=check_interval_days):
                 return False
-        except Exception:
-            # If we can't read the marker, assume update is needed
-            return True
 
-    return True
+        # Skip if an update is already in progress
+        if os.path.exists(update_lock):
+            return False
+
+        # Get installed version
+        import yt_dlp
+        installed_version = yt_dlp.version.__version__
+
+        # Fetch latest version from PyPI
+        pypi_url = "https://pypi.org/pypi/yt-dlp/json"
+        req = Request(pypi_url, headers={"User-Agent": "AnyVideo-Downloader-Plugin"})
+        with urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        latest_version = data.get("info", {}).get("version")
+
+        if not latest_version:
+            return False
+
+        # Touch marker to reset interval timer after successful PyPI check
+        os.makedirs(LIB_PATH, exist_ok=True)
+        with open(update_marker, "w") as f:
+            f.write("checked")
+
+        return installed_version != latest_version
+    except Exception:
+        return False
 
 
 def update_ytdlp_library():
@@ -350,20 +367,43 @@ def update_ytdlp_library():
         return False, f"Failed to launch updater: {str(e)}"
 
 
-def skip_ytdlp_update():
+def launch_plugin_setup():
     """
-    Skip the yt-dlp update check by creating/updating the marker file.
-    This allows users to postpone the update and use the existing bundled version.
+    Launch the combined plugin setup script in a visible terminal window.
+    Creates the lock file BEFORE spawning to prevent race conditions.
 
     Returns:
         tuple: (success: bool, message: str)
     """
-    update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
+    setup_script = os.path.join(PLUGIN_ROOT, "setup_plugin.py")
+
+    if not os.path.exists(setup_script):
+        return False, "Setup script not found"
+
+    # Create lock before spawning to prevent duplicate launches
+    try:
+        with open(PLUGIN_SETUP_LOCK, "w", encoding="utf-8") as f:
+            f.write("in-progress")
+    except Exception as e:
+        return False, f"Failed to create setup lock file: {str(e)}"
 
     try:
-        os.makedirs(LIB_PATH, exist_ok=True)
-        with open(update_marker, "w") as f:
-            f.write("skipped")
-        return True, "Update skipped. Will check again in 5 days."
+        creationflags = (
+            subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+
+        subprocess.Popen(
+            [sys.executable, setup_script],
+            creationflags=creationflags,
+            close_fds=True,
+            start_new_session=True,
+        )
+
+        return True, "Setup started in separate window"
     except Exception as e:
-        return False, f"Failed to skip update: {str(e)}"
+        try:
+            if os.path.exists(PLUGIN_SETUP_LOCK):
+                os.remove(PLUGIN_SETUP_LOCK)
+        except Exception:
+            pass
+        return False, f"Failed to launch setup: {str(e)}"
