@@ -122,6 +122,23 @@ def query(query: str) -> ResultResponse:
         launch_plugin_setup()
         return send_results([plugin_setup_in_progress_result()])
 
+    # Check if yt-dlp is being updated (lock file created by update_ytdlp.py)
+    ytdlp_update_lock = os.path.join(PLUGIN_ROOT, "..", "lib", ".ytdlp_updating")
+    if os.path.exists(ytdlp_update_lock):
+        try:
+            lock_age = datetime.now() - datetime.fromtimestamp(
+                os.path.getmtime(ytdlp_update_lock)
+            )
+            if lock_age < timedelta(minutes=10):
+                return send_results([ytdlp_update_in_progress_result()])
+            else:
+                try:
+                    os.remove(ytdlp_update_lock)
+                except Exception:
+                    pass
+        except Exception:
+            return send_results([ytdlp_update_in_progress_result()])
+
     if not YTDLP_AVAILABLE:
         return send_results([ytdlp_update_in_progress_result()])
 
