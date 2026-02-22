@@ -92,12 +92,12 @@ def is_ytdlp_update_needed():
     """Check if yt-dlp needs to be installed/updated (first-run check)."""
     ytdlp_path = os.path.join(LIB_PATH, "yt_dlp")
     update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
-    
+
     if not os.path.exists(ytdlp_path):
         return True
     if not os.path.exists(update_marker):
         return True
-    
+
     return False
 
 
@@ -120,41 +120,20 @@ def update_ytdlp():
 
 
 def main():
-    print("=" * 50)
-    print("AnyVideo Downloader - Plugin Setup")
-    print("=" * 50)
-    print()
-
     try:
         with open(LOCK_FILE, "w") as f:
             f.write("in-progress")
-    except Exception as e:
-        print(f"Failed to create lock file: {e}")
+    except Exception as _:
         time.sleep(5)
         sys.exit(1)
 
     try:
-        ffmpeg_ok = True
-        ytdlp_ok = True
-
         if is_ffmpeg_needed():
-            ffmpeg_ok = download_ffmpeg()
-        else:
-            print("FFmpeg binaries already present. Skipping.")
-
-        print()
+            download_ffmpeg()
 
         if is_ytdlp_update_needed():
-            ytdlp_ok = update_ytdlp()
-        else:
-            print("yt-dlp is up to date. Skipping.")
+            update_ytdlp()
 
-        print()
-        if ffmpeg_ok and ytdlp_ok:
-            print("Setup completed successfully!")
-        else:
-            print("Setup completed with errors. Some components may not work.")
-        print("You can close this window and use the plugin now.")
     finally:
         try:
             if os.path.exists(LOCK_FILE):
