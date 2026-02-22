@@ -386,8 +386,8 @@ def launch_plugin_setup():
     try:
         with open(PLUGIN_SETUP_LOCK, "w", encoding="utf-8") as f:
             f.write("in-progress")
-    except Exception:
-        pass
+    except Exception as e:
+        return False, f"Failed to create setup lock file: {str(e)}"
 
     try:
         creationflags = (
