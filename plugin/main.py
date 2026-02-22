@@ -140,7 +140,8 @@ def query(query: str) -> ResultResponse:
             return send_results([ytdlp_update_in_progress_result()])
 
     if not YTDLP_AVAILABLE:
-        return send_results([ytdlp_update_in_progress_result()])
+        launch_plugin_setup()
+        return send_results([plugin_setup_in_progress_result()])
 
     if not query.strip():
         return send_results([init_results(d_path)])

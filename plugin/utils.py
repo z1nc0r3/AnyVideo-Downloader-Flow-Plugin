@@ -325,14 +325,12 @@ def check_ytdlp_version(check_interval_days=7):
         if not latest_version:
             return False
 
-        if installed_version == latest_version:
-            # Versions match — touch marker to reset interval timer
-            os.makedirs(LIB_PATH, exist_ok=True)
-            with open(update_marker, "w") as f:
-                f.write("checked")
-            return False
+        # Touch marker to reset interval timer after successful PyPI check
+        os.makedirs(LIB_PATH, exist_ok=True)
+        with open(update_marker, "w") as f:
+            f.write("checked")
 
-        return True
+        return installed_version != latest_version
     except Exception:
         return False
 

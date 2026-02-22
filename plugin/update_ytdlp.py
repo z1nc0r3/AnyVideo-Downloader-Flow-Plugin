@@ -91,7 +91,7 @@ def main():
         if success:
             with open(UPDATE_MARKER, "w") as f:
                 f.write("updated")
-                
+
     finally:
         try:
             if os.path.exists(LOCK_FILE):
