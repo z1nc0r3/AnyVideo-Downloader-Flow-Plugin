@@ -24,7 +24,7 @@ def ffmpeg_not_found_result() -> Result:
 def error_result() -> Result:
     return Result(
         Title="Something went wrong!",
-        SubTitle=f"Couldn't extract video information.",
+        SubTitle="Couldn't extract video information.",
         IcoPath="Images/error.png",
     )
 
@@ -58,6 +58,8 @@ def ytdlp_update_in_progress_result() -> Result:
 
 
 def best_video_result(
+    title,
+    subtitle,
     query,
     thumbnail,
     format,
@@ -66,12 +68,9 @@ def best_video_result(
     pref_audio_path,
     auto_open_folder=False,
 ) -> Result:
-    result_title = "★ BEST VIDEO QUALITY"
-    if format.get("resolution"):
-        result_title = f"★ BEST VIDEO QUALITY [{format['resolution']}]"
-
     return Result(
-        Title=result_title,
+        Title=title,
+        SubTitle=subtitle,
         IcoPath=thumbnail or "Images/app.png",
         JsonRPCAction={
             "method": "download",
@@ -89,6 +88,8 @@ def best_video_result(
 
 
 def best_audio_result(
+    title,
+    subtitle,
     query,
     thumbnail,
     format,
@@ -97,12 +98,9 @@ def best_audio_result(
     pref_audio_path,
     auto_open_folder=False,
 ) -> Result:
-    result_title = "★ BEST AUDIO ONLY"
-    if format.get("tbr"):
-        result_title = f"★ BEST AUDIO ONLY ({round(format['tbr'], 2)} kbps)"
-
     return Result(
-        Title=result_title,
+        Title=title,
+        SubTitle=subtitle,
         IcoPath=thumbnail or "Images/app.png",
         JsonRPCAction={
             "method": "download",
@@ -120,30 +118,16 @@ def best_audio_result(
 
 
 def query_result(
+    title,
+    subtitle,
     query,
     thumbnail,
-    title,
     format,
     download_path,
     pref_video_path,
     pref_audio_path,
     auto_open_folder=False,
 ) -> Result:
-    # Build subtitle with consistent spacing
-    subtitle_parts = [f"Res: {format['resolution']}"]
-
-    if format.get("tbr") is not None:
-        subtitle_parts.append(f"({round(format['tbr'], 2)} kbps)")
-
-    if format.get("filesize"):
-        size_mb = round(format["filesize"] / 1024 / 1024, 2)
-        subtitle_parts.append(f"Size: {size_mb}MB")
-
-    if format.get("fps"):
-        subtitle_parts.append(f"FPS: {int(format['fps'])}")
-
-    subtitle = " ┃ ".join(subtitle_parts)
-
     return Result(
         Title=title,
         SubTitle=subtitle,
