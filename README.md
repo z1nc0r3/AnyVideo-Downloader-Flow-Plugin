@@ -1,4 +1,4 @@
-# AnyVideo Downloader v2.3.1 - [2026-Feb-06]  🔻
+# AnyVideo Downloader v2.4.0 - [2026-March-15]  🔻
 
 
 ![](https://github.com/user-attachments/assets/18a6cff4-ee86-4322-a72d-c6a02628503a)
