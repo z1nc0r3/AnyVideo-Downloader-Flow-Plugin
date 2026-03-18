@@ -1,10 +1,4 @@
 body:
-    - type: input
-      attributes:
-          name: download_path
-          label: "Download path:"
-          description: "Enter the path where you want to save the downloaded files."
-          defaultValue: "%USERPROFILE%\\Downloads"
     - type: dropdown
       attributes:
           name: sorting_order
@@ -16,6 +10,48 @@ body:
               - File Size
               - Total Bitrate
               - FPS
+    - type: checkbox
+      attributes:
+          name: pin_best_results
+          label: "Pin Best Results to Top"
+          defaultValue: true
+          description: "If disabled, best results will be sorted normally within the list."
+    - type: input
+      attributes:
+          name: title_format
+          label: "Result Title Format"
+          defaultValue: "{title}"
+          description: "Variables allowed: {title}, {full_title}, {resolution}, {tbr}, {size}, {fps}"
+    - type: input
+      attributes:
+          name: subtitle_format
+          label: "Result Subtitle Format"
+          defaultValue: "Res: {resolution} ┃ {tbr} kbps ┃ Size: {size}MB ┃ FPS: {fps}"
+          description: "Variables allowed: {title}, {full_title}, {resolution}, {tbr}, {size}, {fps}"
+    - type: input
+      attributes:
+          name: best_video_title_format
+          label: "Best Video Title Format"
+          defaultValue: "BEST VIDEO: {resolution}"
+          description: "Format for the top video result (can be empty). Allowed: {title}, {full_title}, {resolution}, {tbr}, {size}, {fps}"
+    - type: input
+      attributes:
+          name: best_audio_title_format
+          label: "Best Audio Title Format"
+          defaultValue: "BEST AUDIO: {tbr} kbps"
+          description: "Format for the top audio result (can be empty). Allowed: {title}, {full_title}, {tbr}, {size}"
+    - type: input
+      attributes:
+          name: download_path
+          label: "Download path:"
+          description: "Enter the path where you want to save the downloaded files."
+          defaultValue: "%USERPROFILE%\\Downloads"
+    - type: checkbox
+      attributes:
+          name: auto_open_folder
+          label: "Auto-open download folder"
+          defaultValue: true
+          description: "Automatically open the download folder after download completes."
     - type: dropdown
       attributes:
           name: preferred_video_format
@@ -42,9 +78,3 @@ body:
               - flac
               - aac
               - opus
-    - type: checkbox
-      attributes:
-          name: auto_open_folder
-          label: "Auto-open download folder"
-          defaultValue: true
-          description: "Automatically open the download folder after download completes."
