@@ -7,7 +7,10 @@ class CustomYoutubeDL(YoutubeDL):
         self.error_message = None
 
     def report_error(self, message, *args, **kwargs):
-        self.error_message = message
+        try:
+            self.error_message = message % args if args else message
+        except Exception:
+            self.error_message = message
 
     def extract_info(
         self,

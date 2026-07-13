@@ -20,6 +20,7 @@ from utils import (
     sort_by_size,
     resolution_value,
     numeric_value,
+    log_message,
     log_exception,
     verify_ffmpeg_binaries,
     verify_ffmpeg,
@@ -86,55 +87,80 @@ def _format_resolution(format_info):
     return None
 
 
+def _append_format(formats, seen, format_info, allow_unknown=False):
+    format_id = format_info.get("format_id")
+    resolution = _format_resolution(format_info)
+    filesize = numeric_value(
+        format_info.get("filesize") or format_info.get("filesize_approx"), None
+    )
+    tbr = numeric_value(format_info.get("tbr"), None)
+    fps = numeric_value(format_info.get("fps"), None)
+    width = numeric_value(format_info.get("width"), None)
+    height = numeric_value(format_info.get("height"), None)
+
+    if not format_id:
+        return
+
+    if not resolution and allow_unknown and format_info.get("url"):
+        resolution = "unknown"
+
+    if not resolution:
+        return
+    if not allow_unknown and not tbr and not filesize:
+        return
+
+    normalized = {
+        "format_id": format_id,
+        "resolution": resolution,
+        "filesize": filesize,
+        "tbr": tbr,
+        "fps": fps,
+        "width": width,
+        "height": height,
+        "vcodec": format_info.get("vcodec"),
+        "acodec": format_info.get("acodec"),
+        "ext": format_info.get("ext"),
+    }
+    dedupe_key = (
+        normalized["format_id"],
+        normalized["resolution"],
+        normalized["tbr"],
+        normalized["filesize"],
+        normalized["fps"],
+    )
+    if dedupe_key in seen:
+        return
+
+    seen.add(dedupe_key)
+    formats.append(normalized)
+
+
+def _get_raw_formats(info):
+    raw_formats = info.get("formats") or []
+    if not isinstance(raw_formats, (list, tuple)):
+        raw_formats = []
+
+    if not raw_formats and info.get("format_id") and info.get("url"):
+        raw_formats = [info]
+
+    return raw_formats
+
+
 def _build_formats(info):
     formats = []
     seen = set()
-    raw_formats = info.get("formats") or []
-    if not isinstance(raw_formats, (list, tuple)):
-        return formats
+    raw_formats = _get_raw_formats(info)
 
     for format_info in raw_formats:
         if not isinstance(format_info, dict):
             continue
-        format_id = format_info.get("format_id")
-        resolution = _format_resolution(format_info)
-        filesize = numeric_value(
-            format_info.get("filesize") or format_info.get("filesize_approx"), None
-        )
-        tbr = numeric_value(format_info.get("tbr"), None)
-        fps = numeric_value(format_info.get("fps"), None)
-        width = numeric_value(format_info.get("width"), None)
-        height = numeric_value(format_info.get("height"), None)
+        _append_format(formats, seen, format_info)
 
-        if not format_id or not resolution:
-            continue
-        if not tbr and not filesize:
-            continue
-
-        normalized = {
-            "format_id": format_id,
-            "resolution": resolution,
-            "filesize": filesize,
-            "tbr": tbr,
-            "fps": fps,
-            "width": width,
-            "height": height,
-            "vcodec": format_info.get("vcodec"),
-            "acodec": format_info.get("acodec"),
-            "ext": format_info.get("ext"),
-        }
-        dedupe_key = (
-            normalized["format_id"],
-            normalized["resolution"],
-            normalized["tbr"],
-            normalized["filesize"],
-            normalized["fps"],
-        )
-        if dedupe_key in seen:
-            continue
-
-        seen.add(dedupe_key)
-        formats.append(normalized)
+    if not formats:
+        for format_info in raw_formats:
+            if not isinstance(format_info, dict):
+                continue
+            _append_format(formats, seen, format_info, allow_unknown=True)
 
     return formats
 
@@ -256,6 +282,8 @@ def query(query: str) -> ResultResponse:
     info = ydl.extract_info(query)
 
     if info is None:
+        if ydl.error_message:
+            log_message(f"Failed to extract video information: {ydl.error_message}")
         return send_results([error_result()])
 
     formats = _build_formats(info)
@@ -292,7 +320,9 @@ def query(query: str) -> ResultResponse:
 
     # Find best video (highest resolution, then highest bitrate)
     video_formats = [
-        f for f in formats if f.get("resolution") and f["resolution"] != "audio only"
+        f
+        for f in formats
+        if f.get("resolution") and f["resolution"] not in ("audio only", "unknown")
     ]
     if video_formats:
         try:
