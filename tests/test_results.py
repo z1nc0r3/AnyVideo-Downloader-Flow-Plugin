@@ -114,6 +114,7 @@ class TestBestVideoResult:
         assert params[4] == "mp3"
         assert params[5] is False  # is_audio
         assert params[6] is True   # auto_open_folder
+        assert params[7] is True   # overwrite_existing_files
 
     def test_thumbnail_fallback(self):
         fmt = self._make_format()
@@ -145,9 +146,18 @@ class TestBestAudioResult:
     def test_is_audio_true_in_params(self):
         fmt = {"format_id": "140", "tbr": 128}
         r = best_audio_result("http://example.com", None, fmt,
-                              "/downloads", "mp4", "mp3")
+                               "/downloads", "mp4", "mp3")
         params = r.JsonRPCAction["parameters"]
         assert params[5] is True  # is_audio
+
+    def test_overwrite_setting_in_params(self):
+        fmt = {"format_id": "140", "tbr": 128}
+        r = best_audio_result(
+            "http://example.com", None, fmt, "/downloads", "mp4", "mp3",
+            overwrite_existing_files=False
+        )
+        params = r.JsonRPCAction["parameters"]
+        assert params[7] is False
 
 
 class TestQueryResult:

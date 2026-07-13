@@ -22,6 +22,12 @@ class TestIsValidUrl:
     def test_url_with_path_and_params(self):
         assert utils.is_valid_url("https://example.com/path?q=1&b=2") is True
 
+    def test_long_tld(self):
+        assert utils.is_valid_url("https://example.technology/video") is True
+
+    def test_url_with_trailing_text(self):
+        assert utils.is_valid_url("https://example.com/video extra") is False
+
     def test_plain_text(self):
         assert utils.is_valid_url("not a url") is False
 
@@ -67,6 +73,15 @@ class TestSortByResolution:
         result = utils.sort_by_resolution(formats)
         assert result[0]["resolution"] == "1920x1080"
         assert result[1]["resolution"] == "640x480"
+
+    def test_unknown_resolution_at_bottom(self):
+        formats = [
+            {"resolution": "unknown"},
+            {"resolution": "1280x720"},
+        ]
+        result = utils.sort_by_resolution(formats)
+        assert result[0]["resolution"] == "1280x720"
+        assert result[1]["resolution"] == "unknown"
 
 
 # ---------------------------------------------------------------------------
