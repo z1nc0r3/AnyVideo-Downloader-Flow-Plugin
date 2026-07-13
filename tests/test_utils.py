@@ -39,6 +39,21 @@ class TestIsValidUrl:
 
 
 # ---------------------------------------------------------------------------
+# has_extractable_url_target
+# ---------------------------------------------------------------------------
+
+class TestHasExtractableUrlTarget:
+    def test_bare_domain_is_false(self):
+        assert utils.has_extractable_url_target("https://youtube.com") is False
+
+    def test_domain_with_path_is_true(self):
+        assert utils.has_extractable_url_target("https://youtu.be/abc123") is True
+
+    def test_domain_with_query_is_true(self):
+        assert utils.has_extractable_url_target("https://youtube.com/watch?v=abc123") is True
+
+
+# ---------------------------------------------------------------------------
 # sort_by_resolution
 # ---------------------------------------------------------------------------
 
@@ -98,6 +113,16 @@ class TestSortByTbr:
         result = utils.sort_by_tbr(formats)
         assert [f["tbr"] for f in result] == [500, 250, 100]
 
+    def test_missing_and_string_values_do_not_crash(self):
+        formats = [
+            {"tbr": None},
+            {"tbr": "500"},
+            {"tbr": "unknown"},
+            {},
+        ]
+        result = utils.sort_by_tbr(formats)
+        assert result[0]["tbr"] == "500"
+
 
 # ---------------------------------------------------------------------------
 # sort_by_fps
@@ -124,6 +149,15 @@ class TestSortByFps:
         assert result[1]["fps"] == 30
         assert result[2]["fps"] is None
 
+    def test_string_values_do_not_crash(self):
+        formats = [
+            {"fps": "not available"},
+            {"fps": "60"},
+            {"fps": None},
+        ]
+        result = utils.sort_by_fps(formats)
+        assert result[0]["fps"] == "60"
+
 
 # ---------------------------------------------------------------------------
 # sort_by_size
@@ -149,6 +183,15 @@ class TestSortBySize:
         assert result[0]["filesize"] == 5000
         assert result[1]["filesize"] == 1000
         assert result[2]["filesize"] is None
+
+    def test_string_values_do_not_crash(self):
+        formats = [
+            {"filesize": "unknown"},
+            {"filesize": "5000"},
+            {"filesize": None},
+        ]
+        result = utils.sort_by_size(formats)
+        assert result[0]["filesize"] == "5000"
 
 
 # ---------------------------------------------------------------------------

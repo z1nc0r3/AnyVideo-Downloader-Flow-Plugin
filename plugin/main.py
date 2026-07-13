@@ -13,6 +13,7 @@ from pyflowlauncher import Plugin, ResultResponse, send_results
 from pyflowlauncher.settings import settings
 from utils import (
     is_valid_url,
+    has_extractable_url_target,
     sort_by_resolution,
     sort_by_tbr,
     sort_by_fps,
@@ -242,10 +243,14 @@ def query(query: str) -> ResultResponse:
     if not is_valid_url(query):
         return send_results([invalid_result()])
 
+    if not has_extractable_url_target(query):
+        return send_results([invalid_result()])
+
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "socket_timeout": 30,
+        "noplaylist": True,
     }
     ydl = CustomYoutubeDL(params=ydl_opts)
     info = ydl.extract_info(query)
@@ -414,6 +419,7 @@ def download(
         "--quiet",
         "--progress",
         "--no-mtime",
+        "--no-playlist",
         "--no-part",
         "--retries",
         "3",

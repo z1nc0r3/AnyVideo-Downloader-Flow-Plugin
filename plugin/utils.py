@@ -67,6 +67,19 @@ def is_valid_url(url: str) -> bool:
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
+def has_extractable_url_target(url: str) -> bool:
+    """
+    Returns True when a URL has more than just a scheme and domain.
+    """
+    try:
+        parsed = urlparse(url.strip())
+    except Exception:
+        return False
+
+    path = (parsed.path or "").strip("/")
+    return bool(path or parsed.query or parsed.fragment)
+
+
 def resolution_value(format):
     """
     Returns a sortable resolution tuple for a yt-dlp format dictionary.
