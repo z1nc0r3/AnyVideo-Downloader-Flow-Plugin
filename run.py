@@ -2,9 +2,13 @@ import sys
 import os
 
 plugindir = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(plugindir)
-sys.path.append(os.path.join(plugindir, "lib"))
-sys.path.append(os.path.join(plugindir, "plugin"))
+for path in (
+    plugindir,
+    os.path.join(plugindir, "lib"),
+    os.path.join(plugindir, "plugin"),
+):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 
 if __name__ == "__main__":

@@ -1,28 +1,26 @@
-import re
 import os
 import json
 import zipfile
 import sys
 import subprocess
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from urllib.request import urlopen, Request
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
 FFMPEG_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
 PLUGIN_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "plugin_setup.lock")
-URL_REGEX = (
-    "((http|https)://)(www.)?"
-    + "[a-zA-Z0-9@:%._\\+~#?&//=]"
-    + "{1,256}\\.[a-z]"
-    + "{2,6}\\b([-a-zA-Z0-9@:%"
-    + "._\\+~#?&//=]*)"
+YT_DLP_LAST_CHECK = os.path.join(LIB_PATH, ".ytdlp_last_check")
+YT_DLP_LAST_SUCCESSFUL_UPDATE = os.path.join(
+    LIB_PATH, ".ytdlp_last_successful_update"
 )
+YT_DLP_LEGACY_UPDATE_MARKER = os.path.join(LIB_PATH, ".ytdlp_last_update")
 
 
 def is_valid_url(url: str) -> bool:
     """
-    Check if the given URL is valid based on a predefined regex pattern.
+    Check if the given URL has an HTTP(S) scheme and network location.
 
     Args:
         url (str): The URL string to validate.
@@ -30,6 +28,17 @@ def is_valid_url(url: str) -> bool:
     Returns:
         bool: True if the URL matches the regex pattern, False otherwise.
     """
+
+    try:
+        cleaned = url.strip()
+        if not cleaned or any(char.isspace() for char in cleaned):
+            return False
+        parsed = urlparse(cleaned)
+    except Exception:
+        return False
+
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
 
 def resolution_value(format):
     """
@@ -109,6 +118,24 @@ def sort_by_size(formats):
             -x["filesize"] if x.get("filesize") is not None else float("-inf"),
         ),
     )
+
+
+def safe_extract_zip(zip_ref, destination: str) -> None:
+    """
+    Extract a zip file only when every member stays inside destination.
+    """
+    destination = os.path.abspath(destination)
+
+    for member in zip_ref.infolist():
+        member_path = os.path.abspath(os.path.join(destination, member.filename))
+        try:
+            is_safe = os.path.commonpath([destination, member_path]) == destination
+        except ValueError:
+            is_safe = False
+        if not is_safe:
+            raise ValueError(f"Unsafe archive member path: {member.filename}")
+
+    zip_ref.extractall(destination)
 
 
 def _is_valid_executable(path: str) -> bool:
@@ -290,7 +317,7 @@ def extract_ffmpeg():
 
     try:
         with zipfile.ZipFile(ffmpeg_zip, "r") as zip_ref:
-            zip_ref.extractall(os.path.dirname(__file__))
+            safe_extract_zip(zip_ref, os.path.dirname(__file__))
         os.remove(ffmpeg_zip)
     except Exception:
         return False, "Failed to extract FFmpeg archive."
@@ -310,13 +337,17 @@ def check_ytdlp_version(check_interval_days=7):
     Returns:
         bool: True if update is available, False otherwise (including on errors).
     """
-    update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
     update_lock = os.path.join(LIB_PATH, ".ytdlp_updating")
 
     try:
         # Skip if marker is fresh (checked recently)
-        if os.path.exists(update_marker):
-            last_check = datetime.fromtimestamp(os.path.getmtime(update_marker))
+        check_marker = (
+            YT_DLP_LAST_CHECK
+            if os.path.exists(YT_DLP_LAST_CHECK)
+            else YT_DLP_LEGACY_UPDATE_MARKER
+        )
+        if os.path.exists(check_marker):
+            last_check = datetime.fromtimestamp(os.path.getmtime(check_marker))
             if datetime.now() - last_check < timedelta(days=check_interval_days):
                 return False
 
@@ -338,12 +369,14 @@ def check_ytdlp_version(check_interval_days=7):
         if not latest_version:
             return False
 
-        # Touch marker to reset interval timer after successful PyPI check
-        os.makedirs(LIB_PATH, exist_ok=True)
-        with open(update_marker, "w") as f:
-            f.write("checked")
+        update_available = installed_version != latest_version
 
-        return installed_version != latest_version
+        if not update_available:
+            os.makedirs(LIB_PATH, exist_ok=True)
+            with open(YT_DLP_LAST_CHECK, "w") as f:
+                f.write("checked")
+
+        return update_available
     except Exception:
         return False
 
