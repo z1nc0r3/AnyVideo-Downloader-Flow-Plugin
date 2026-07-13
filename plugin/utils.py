@@ -3,12 +3,14 @@ import json
 import zipfile
 import sys
 import subprocess
+import traceback
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 from urllib.request import urlopen, Request
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "lib"))
+PLUGIN_LOG = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", "plugin.log"))
 FFMPEG_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "ffmpeg_setup.lock")
 PLUGIN_SETUP_LOCK = os.path.join(PLUGIN_ROOT, "plugin_setup.lock")
 YT_DLP_LAST_CHECK = os.path.join(LIB_PATH, ".ytdlp_last_check")
@@ -16,6 +18,31 @@ YT_DLP_LAST_SUCCESSFUL_UPDATE = os.path.join(
     LIB_PATH, ".ytdlp_last_successful_update"
 )
 YT_DLP_LEGACY_UPDATE_MARKER = os.path.join(LIB_PATH, ".ytdlp_last_update")
+
+
+def log_message(message: str) -> None:
+    """Write a diagnostic message without interrupting plugin execution."""
+    try:
+        timestamp = datetime.now().isoformat(timespec="seconds")
+        with open(PLUGIN_LOG, "a", encoding="utf-8") as log_file:
+            log_file.write(f"[{timestamp}] {message}\n")
+    except Exception:
+        pass
+
+
+def log_exception(message: str, error: Exception) -> None:
+    """Write exception details without interrupting plugin execution."""
+    log_message(f"{message}: {error}\n{traceback.format_exc()}")
+
+
+def numeric_value(value, default=0):
+    """Convert yt-dlp numeric metadata to a sortable number."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def is_valid_url(url: str) -> bool:
@@ -48,10 +75,10 @@ def resolution_value(format):
     if resolution == "audio only":
         return (0, 0)
 
-    width = format.get("width")
-    height = format.get("height")
-    if isinstance(width, int) and isinstance(height, int):
-        return (width, height)
+    width = numeric_value(format.get("width"), None)
+    height = numeric_value(format.get("height"), None)
+    if width and height:
+        return (int(width), int(height))
 
     if "x" in resolution:
         try:
@@ -82,7 +109,7 @@ def sort_by_tbr(formats):
     Returns:
         list: The input list sorted by the 'tbr' value in descending order.
     """
-    return sorted(formats, key=lambda x: x.get("tbr") or 0, reverse=True)
+    return sorted(formats, key=lambda x: numeric_value(x.get("tbr")), reverse=True)
 
 
 def sort_by_fps(formats):
@@ -97,7 +124,7 @@ def sort_by_fps(formats):
         formats,
         key=lambda x: (
             x.get("fps") is None,
-            -x["fps"] if x.get("fps") is not None else float("-inf"),
+            -numeric_value(x.get("fps"), float("-inf")),
         ),
     )
 
@@ -115,7 +142,7 @@ def sort_by_size(formats):
         formats,
         key=lambda x: (
             x.get("filesize") is None,
-            -x["filesize"] if x.get("filesize") is not None else float("-inf"),
+            -numeric_value(x.get("filesize"), float("-inf")),
         ),
     )
 

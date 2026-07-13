@@ -18,6 +18,8 @@ from utils import (
     sort_by_fps,
     sort_by_size,
     resolution_value,
+    numeric_value,
+    log_exception,
     verify_ffmpeg_binaries,
     verify_ffmpeg,
     extract_ffmpeg,
@@ -72,10 +74,10 @@ def _format_resolution(format_info):
     if resolution and resolution != "unknown":
         return resolution
 
-    width = format_info.get("width")
-    height = format_info.get("height")
-    if isinstance(width, int) and isinstance(height, int) and width > 0 and height > 0:
-        return f"{width}x{height}"
+    width = numeric_value(format_info.get("width"))
+    height = numeric_value(format_info.get("height"))
+    if width > 0 and height > 0:
+        return f"{int(width)}x{int(height)}"
 
     if format_info.get("vcodec") == "none":
         return "audio only"
@@ -83,37 +85,25 @@ def _format_resolution(format_info):
     return None
 
 
-def _format_score(format_info):
-    score = 0
-    resolution = format_info.get("resolution")
-
-    if format_info.get("format_id"):
-        score += 2
-    if resolution and resolution != "unknown":
-        score += 3
-    if format_info.get("tbr"):
-        score += 2
-    if format_info.get("filesize"):
-        score += 2
-    if format_info.get("fps"):
-        score += 1
-    if format_info.get("vcodec") and format_info.get("vcodec") != "none":
-        score += 1
-    if format_info.get("acodec") and format_info.get("acodec") != "none":
-        score += 1
-
-    return score
-
-
 def _build_formats(info):
     formats = []
     seen = set()
+    raw_formats = info.get("formats") or []
+    if not isinstance(raw_formats, (list, tuple)):
+        return formats
 
-    for format_info in info.get("formats", []):
+    for format_info in raw_formats:
+        if not isinstance(format_info, dict):
+            continue
         format_id = format_info.get("format_id")
         resolution = _format_resolution(format_info)
-        filesize = format_info.get("filesize") or format_info.get("filesize_approx")
-        tbr = format_info.get("tbr")
+        filesize = numeric_value(
+            format_info.get("filesize") or format_info.get("filesize_approx"), None
+        )
+        tbr = numeric_value(format_info.get("tbr"), None)
+        fps = numeric_value(format_info.get("fps"), None)
+        width = numeric_value(format_info.get("width"), None)
+        height = numeric_value(format_info.get("height"), None)
 
         if not format_id or not resolution:
             continue
@@ -125,9 +115,9 @@ def _build_formats(info):
             "resolution": resolution,
             "filesize": filesize,
             "tbr": tbr,
-            "fps": format_info.get("fps"),
-            "width": format_info.get("width"),
-            "height": format_info.get("height"),
+            "fps": fps,
+            "width": width,
+            "height": height,
             "vcodec": format_info.get("vcodec"),
             "acodec": format_info.get("acodec"),
             "ext": format_info.get("ext"),
@@ -145,8 +135,7 @@ def _build_formats(info):
         seen.add(dedupe_key)
         formats.append(normalized)
 
-    formats.sort(key=_format_score, reverse=True)
-    return formats[:MAX_FORMAT_RESULTS]
+    return formats
 
 
 def fetch_settings() -> Tuple[str, str, str, str, bool, bool]:
@@ -271,14 +260,20 @@ def query(query: str) -> ResultResponse:
             return send_results([error_result()])
         return send_results([empty_result()])
 
-    if sort == "Resolution":
+    try:
+        if sort == "Resolution":
+            formats = sort_by_resolution(formats)
+        elif sort == "File Size":
+            formats = sort_by_size(formats)
+        elif sort == "Total Bitrate":
+            formats = sort_by_tbr(formats)
+        elif sort == "FPS":
+            formats = sort_by_fps(formats)
+    except Exception as e:
+        log_exception("Failed to sort formats", e)
         formats = sort_by_resolution(formats)
-    elif sort == "File Size":
-        formats = sort_by_size(formats)
-    elif sort == "Total Bitrate":
-        formats = sort_by_tbr(formats)
-    elif sort == "FPS":
-        formats = sort_by_fps(formats)
+
+    formats = formats[:MAX_FORMAT_RESULTS]
 
     results = []
 
@@ -315,14 +310,14 @@ def query(query: str) -> ResultResponse:
                     overwrite,
                 )
             )
-        except (ValueError, TypeError):
-            pass  # Skip if we can't determine best video
+        except (ValueError, TypeError) as e:
+            log_exception("Failed to determine best video format", e)
 
     # Find best audio (highest bitrate)
     audio_formats = [f for f in formats if f.get("resolution") == "audio only"]
     if audio_formats:
         try:
-            best_audio = max(audio_formats, key=lambda x: x.get("tbr") or 0)
+            best_audio = max(audio_formats, key=lambda x: numeric_value(x.get("tbr")))
             results.append(
                 best_audio_result(
                     query,
@@ -335,8 +330,8 @@ def query(query: str) -> ResultResponse:
                     overwrite,
                 )
             )
-        except (ValueError, TypeError):
-            pass  # Skip if we can't determine best audio
+        except (ValueError, TypeError) as e:
+            log_exception("Failed to determine best audio format", e)
 
     results.extend(
         [
@@ -440,8 +435,8 @@ def download(
         result = subprocess.run(command)
         if result.returncode == 0 and auto_open_folder and os.path.isdir(download_path):
             os.startfile(download_path)
-    except Exception:
-        pass
+    except Exception as e:
+        log_exception("Download command failed", e)
 
 
 if __name__ == "__main__":
