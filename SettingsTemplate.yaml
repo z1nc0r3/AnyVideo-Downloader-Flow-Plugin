@@ -48,3 +48,9 @@ body:
           label: "Auto-open download folder"
           defaultValue: true
           description: "Automatically open the download folder after download completes."
+    - type: checkbox
+      attributes:
+          name: overwrite_existing_files
+          label: "Overwrite existing files"
+          defaultValue: true
+          description: "Replace existing files with the same output filename."

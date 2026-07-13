@@ -160,22 +160,28 @@ def fetch_settings() -> Tuple[str, str, str, str, bool, bool]:
             - pref_video_format (str): The preferred video format (default is "mp4").
             - pref_audio_format (str): The preferred audio format (default is "mp3").
             - auto_open_folder (bool): Whether to automatically open the download folder after download.
+            - overwrite_existing_files (bool): Whether to overwrite duplicate filenames.
     """
     try:
-        download_path = settings().get("download_path") or DEFAULT_DOWNLOAD_PATH
-        if not os.path.exists(download_path):
-            download_path = DEFAULT_DOWNLOAD_PATH
+        user_settings = settings()
+        download_path = _normalize_download_path(
+            user_settings.get("download_path") or DEFAULT_DOWNLOAD_PATH
+        )
 
-        sorting_order = settings().get("sorting_order") or "Resolution"
-        pref_video_format = settings().get("preferred_video_format") or "mp4"
-        pref_audio_format = settings().get("preferred_audio_format") or "mp3"
-        auto_open_folder = settings().get("auto_open_folder", True)
+        sorting_order = user_settings.get("sorting_order") or "Resolution"
+        pref_video_format = user_settings.get("preferred_video_format") or "mp4"
+        pref_audio_format = user_settings.get("preferred_audio_format") or "mp3"
+        auto_open_folder = _as_bool(user_settings.get("auto_open_folder", True), True)
+        overwrite_existing_files = _as_bool(
+            user_settings.get("overwrite_existing_files", True), True
+        )
     except Exception:
         download_path = DEFAULT_DOWNLOAD_PATH
         sorting_order = "Resolution"
         pref_video_format = "mp4"
         pref_audio_format = "mp3"
         auto_open_folder = False
+        overwrite_existing_files = True
 
     return (
         download_path,
@@ -183,12 +189,13 @@ def fetch_settings() -> Tuple[str, str, str, str, bool, bool]:
         pref_video_format,
         pref_audio_format,
         auto_open_folder,
+        overwrite_existing_files,
     )
 
 
 @plugin.on_method
 def query(query: str) -> ResultResponse:
-    d_path, sort, pvf, paf, auto_open = fetch_settings()
+    d_path, sort, pvf, paf, auto_open, overwrite = fetch_settings()
 
     # Check if combined plugin setup is in progress
     plugin_setup_lock = os.path.join(PLUGIN_ROOT, "plugin_setup.lock")
@@ -245,8 +252,6 @@ def query(query: str) -> ResultResponse:
 
     if not is_valid_url(query):
         return send_results([invalid_result()])
-
-    query = query.replace("https://", "http://")
 
     ydl_opts = {
         "quiet": True,
@@ -307,6 +312,7 @@ def query(query: str) -> ResultResponse:
                     pvf,
                     paf,
                     auto_open,
+                    overwrite,
                 )
             )
         except (ValueError, TypeError):
@@ -326,6 +332,7 @@ def query(query: str) -> ResultResponse:
                     pvf,
                     paf,
                     auto_open,
+                    overwrite,
                 )
             )
         except (ValueError, TypeError):
@@ -342,6 +349,7 @@ def query(query: str) -> ResultResponse:
                 pvf,
                 paf,
                 auto_open,
+                overwrite,
             )
             for format in formats
         ]
@@ -358,6 +366,7 @@ def download(
     pref_audio_path: str,
     is_audio: bool,
     auto_open_folder: bool = False,
+    overwrite_existing_files: bool = True,
 ) -> None:
     if check_ytdlp_version(CHECK_INTERVAL_DAYS):
         update_ytdlp_library()
@@ -410,13 +419,15 @@ def download(
         "--quiet",
         "--progress",
         "--no-mtime",
-        "--force-overwrites",
         "--no-part",
         "--retries",
         "3",
         "--retry-sleep",
         "2",
     ]
+
+    if overwrite_existing_files:
+        command.append("--force-overwrites")
 
     if ffmpeg_path:
         command += ["--ffmpeg-location", ffmpeg_path]
