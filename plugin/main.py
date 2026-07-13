@@ -17,6 +17,7 @@ from utils import (
     sort_by_tbr,
     sort_by_fps,
     sort_by_size,
+    resolution_value,
     verify_ffmpeg_binaries,
     verify_ffmpeg,
     extract_ffmpeg,
@@ -48,11 +49,107 @@ except ImportError:
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 CHECK_INTERVAL_DAYS = 7
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
+MAX_FORMAT_RESULTS = 40
 
 plugin = Plugin()
 
 
-def fetch_settings() -> Tuple[str, str, str, str, bool]:
+def _as_bool(value, default=False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return default
+
+
+def _normalize_download_path(download_path: str) -> str:
+    expanded = os.path.abspath(os.path.expanduser(os.path.expandvars(download_path)))
+    return expanded if os.path.exists(expanded) else DEFAULT_DOWNLOAD_PATH
+
+
+def _format_resolution(format_info):
+    resolution = format_info.get("resolution")
+    if resolution and resolution != "unknown":
+        return resolution
+
+    width = format_info.get("width")
+    height = format_info.get("height")
+    if isinstance(width, int) and isinstance(height, int) and width > 0 and height > 0:
+        return f"{width}x{height}"
+
+    if format_info.get("vcodec") == "none":
+        return "audio only"
+
+    return None
+
+
+def _format_score(format_info):
+    score = 0
+    resolution = format_info.get("resolution")
+
+    if format_info.get("format_id"):
+        score += 2
+    if resolution and resolution != "unknown":
+        score += 3
+    if format_info.get("tbr"):
+        score += 2
+    if format_info.get("filesize"):
+        score += 2
+    if format_info.get("fps"):
+        score += 1
+    if format_info.get("vcodec") and format_info.get("vcodec") != "none":
+        score += 1
+    if format_info.get("acodec") and format_info.get("acodec") != "none":
+        score += 1
+
+    return score
+
+
+def _build_formats(info):
+    formats = []
+    seen = set()
+
+    for format_info in info.get("formats", []):
+        format_id = format_info.get("format_id")
+        resolution = _format_resolution(format_info)
+        filesize = format_info.get("filesize") or format_info.get("filesize_approx")
+        tbr = format_info.get("tbr")
+
+        if not format_id or not resolution:
+            continue
+        if not tbr and not filesize:
+            continue
+
+        normalized = {
+            "format_id": format_id,
+            "resolution": resolution,
+            "filesize": filesize,
+            "tbr": tbr,
+            "fps": format_info.get("fps"),
+            "width": format_info.get("width"),
+            "height": format_info.get("height"),
+            "vcodec": format_info.get("vcodec"),
+            "acodec": format_info.get("acodec"),
+            "ext": format_info.get("ext"),
+        }
+        dedupe_key = (
+            normalized["format_id"],
+            normalized["resolution"],
+            normalized["tbr"],
+            normalized["filesize"],
+            normalized["fps"],
+        )
+        if dedupe_key in seen:
+            continue
+
+        seen.add(dedupe_key)
+        formats.append(normalized)
+
+    formats.sort(key=_format_score, reverse=True)
+    return formats[:MAX_FORMAT_RESULTS]
+
+
+def fetch_settings() -> Tuple[str, str, str, str, bool, bool]:
     """
     Fetches the user settings for the plugin.
 
@@ -162,17 +259,7 @@ def query(query: str) -> ResultResponse:
     if info is None:
         return send_results([error_result()])
 
-    formats = [
-        {
-            "format_id": format.get("format_id"),
-            "resolution": format.get("resolution"),
-            "filesize": format.get("filesize"),
-            "tbr": format.get("tbr"),
-            "fps": format.get("fps"),
-        }
-        for format in info.get("formats", [])
-        if format.get("resolution") and format.get("tbr")
-    ]
+    formats = _build_formats(info)
 
     if not formats:
         if ydl.error_message:
@@ -199,13 +286,15 @@ def query(query: str) -> ResultResponse:
     title = full_title[:50] + "..." if len(full_title) > 50 else full_title
 
     # Find best video (highest resolution, then highest bitrate)
-    video_formats = [f for f in formats if f.get("resolution") and f["resolution"] != "audio only"]
+    video_formats = [
+        f for f in formats if f.get("resolution") and f["resolution"] != "audio only"
+    ]
     if video_formats:
         try:
             best_video = max(
                 video_formats,
                 key=lambda x: (
-                    tuple(map(int, x["resolution"].split("x"))) if x.get("resolution") and "x" in x["resolution"] else (0, 0),
+                    resolution_value(x),
                     x.get("tbr") or 0,
                 ),
             )

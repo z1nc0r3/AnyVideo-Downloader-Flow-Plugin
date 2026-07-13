@@ -31,7 +31,27 @@ def is_valid_url(url: str) -> bool:
         bool: True if the URL matches the regex pattern, False otherwise.
     """
 
-    return bool(re.match(URL_REGEX, url))
+def resolution_value(format):
+    """
+    Returns a sortable resolution tuple for a yt-dlp format dictionary.
+    """
+    resolution = str(format.get("resolution") or "")
+    if resolution == "audio only":
+        return (0, 0)
+
+    width = format.get("width")
+    height = format.get("height")
+    if isinstance(width, int) and isinstance(height, int):
+        return (width, height)
+
+    if "x" in resolution:
+        try:
+            width_text, height_text = resolution.lower().split("x", 1)
+            return (int(width_text), int(height_text))
+        except (TypeError, ValueError):
+            return (0, 0)
+
+    return (0, 0)
 
 
 def sort_by_resolution(formats):
@@ -43,14 +63,7 @@ def sort_by_resolution(formats):
                       Audio-only formats are considered to have the lowest resolution.
     """
 
-    def resolution_to_tuple(resolution):
-        if resolution == "audio only":
-            return (0, 0)
-        return tuple(map(int, resolution.split("x")))
-
-    return sorted(
-        formats, key=lambda x: resolution_to_tuple(x["resolution"]), reverse=True
-    )
+    return sorted(formats, key=resolution_value, reverse=True)
 
 
 def sort_by_tbr(formats):
@@ -60,7 +73,7 @@ def sort_by_tbr(formats):
     Returns:
         list: The input list sorted by the 'tbr' value in descending order.
     """
-    return sorted(formats, key=lambda x: x["tbr"], reverse=True)
+    return sorted(formats, key=lambda x: x.get("tbr") or 0, reverse=True)
 
 
 def sort_by_fps(formats):
@@ -74,8 +87,8 @@ def sort_by_fps(formats):
     return sorted(
         formats,
         key=lambda x: (
-            x["fps"] is None,
-            -x["fps"] if x["fps"] is not None else float("-inf"),
+            x.get("fps") is None,
+            -x["fps"] if x.get("fps") is not None else float("-inf"),
         ),
     )
 
@@ -92,8 +105,8 @@ def sort_by_size(formats):
     return sorted(
         formats,
         key=lambda x: (
-            x["filesize"] is None,
-            -x["filesize"] if x["filesize"] is not None else float("-inf"),
+            x.get("filesize") is None,
+            -x["filesize"] if x.get("filesize") is not None else float("-inf"),
         ),
     )
 
