@@ -33,6 +33,14 @@ def empty_result() -> Result:
     return Result(Title="Couldn't find any video formats.", IcoPath="Images/error.png")
 
 
+def cookie_file_error_result(issue) -> Result:
+    return Result(
+        Title="Cookie file setting needs attention",
+        SubTitle=issue or "Please check the configured cookies.txt path.",
+        IcoPath="Images/error.png",
+    )
+
+
 def ffmpeg_setup_result(issue) -> Result:
     return Result(
         Title="FFmpeg setup in progress...",
@@ -66,6 +74,7 @@ def best_video_result(
     pref_audio_path,
     auto_open_folder=False,
     overwrite_existing_files=True,
+    cookie_file_path="",
 ) -> Result:
     result_title = "★ BEST VIDEO QUALITY"
     if format.get("resolution"):
@@ -85,6 +94,7 @@ def best_video_result(
                 False,
                 auto_open_folder,
                 overwrite_existing_files,
+                cookie_file_path,
             ],
         },
     )
@@ -99,6 +109,7 @@ def best_audio_result(
     pref_audio_path,
     auto_open_folder=False,
     overwrite_existing_files=True,
+    cookie_file_path="",
 ) -> Result:
     result_title = "★ BEST AUDIO ONLY"
     if format.get("tbr"):
@@ -118,6 +129,7 @@ def best_audio_result(
                 True,
                 auto_open_folder,
                 overwrite_existing_files,
+                cookie_file_path,
             ],
         },
     )
@@ -133,6 +145,7 @@ def query_result(
     pref_audio_path,
     auto_open_folder=False,
     overwrite_existing_files=True,
+    cookie_file_path="",
 ) -> Result:
     # Build subtitle with consistent spacing
     subtitle_parts = [f"Res: {format['resolution']}"]
@@ -164,6 +177,7 @@ def query_result(
                 format["resolution"] == "audio only",
                 auto_open_folder,
                 overwrite_existing_files,
+                cookie_file_path,
             ],
         },
     )
