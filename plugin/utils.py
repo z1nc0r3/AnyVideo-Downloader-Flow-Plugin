@@ -45,6 +45,22 @@ def numeric_value(value, default=0):
         return default
 
 
+def as_bool(value, default=False) -> bool:
+    """Convert Flow Launcher setting values to bool."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return default
+
+
+def normalize_path(path: str) -> str:
+    """Expand environment variables and user markers in a filesystem path."""
+    if not path:
+        return ""
+    return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
+
+
 def is_valid_url(url: str) -> bool:
     """
     Check if the given URL has an HTTP(S) scheme and network location.
