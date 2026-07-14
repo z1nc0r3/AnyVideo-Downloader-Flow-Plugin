@@ -9,6 +9,39 @@ import utils
 
 
 # ---------------------------------------------------------------------------
+# settings/path helpers
+# ---------------------------------------------------------------------------
+
+class TestAsBool:
+    def test_bool_values_pass_through(self):
+        assert utils.as_bool(True) is True
+        assert utils.as_bool(False) is False
+
+    def test_truthy_strings(self):
+        assert utils.as_bool("true") is True
+        assert utils.as_bool("YES") is True
+        assert utils.as_bool("1") is True
+        assert utils.as_bool("on") is True
+
+    def test_falsey_strings(self):
+        assert utils.as_bool("false") is False
+        assert utils.as_bool("no") is False
+        assert utils.as_bool("0") is False
+
+    def test_default_for_non_string_non_bool(self):
+        assert utils.as_bool(None, default=True) is True
+
+
+class TestNormalizePath:
+    def test_empty_path_returns_empty_string(self):
+        assert utils.normalize_path("") == ""
+
+    def test_relative_path_is_made_absolute(self):
+        assert utils.normalize_path("cookies.txt").endswith("cookies.txt")
+        assert utils.os.path.isabs(utils.normalize_path("cookies.txt"))
+
+
+# ---------------------------------------------------------------------------
 # is_valid_url
 # ---------------------------------------------------------------------------
 

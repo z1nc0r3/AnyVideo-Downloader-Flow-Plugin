@@ -5,6 +5,7 @@ from results import (
     invalid_result,
     error_result,
     empty_result,
+    cookie_file_error_result,
     ffmpeg_not_found_result,
     ffmpeg_setup_result,
     plugin_setup_in_progress_result,
@@ -45,6 +46,14 @@ class TestEmptyResult:
     def test_fields(self):
         r = empty_result()
         assert "formats" in r.Title.lower()
+
+
+class TestCookieFileErrorResult:
+    def test_fields(self):
+        r = cookie_file_error_result("Cookie file not found")
+        assert "cookie" in r.Title.lower()
+        assert "not found" in r.SubTitle.lower()
+        assert r.IcoPath == "Images/error.png"
 
 
 class TestFfmpegNotFoundResult:
@@ -105,7 +114,9 @@ class TestBestVideoResult:
     def test_json_rpc_action_parameters(self):
         fmt = self._make_format()
         r = best_video_result("http://example.com", "thumb.jpg", fmt,
-                              "/downloads", "mp4", "mp3", auto_open_folder=True)
+                              "/downloads", "mp4", "mp3",
+                              auto_open_folder=True,
+                              cookie_file_path="/cookies.txt")
         params = r.JsonRPCAction["parameters"]
         assert params[0] == "http://example.com"
         assert params[1] == "137"
@@ -115,6 +126,7 @@ class TestBestVideoResult:
         assert params[5] is False  # is_audio
         assert params[6] is True   # auto_open_folder
         assert params[7] is True   # overwrite_existing_files
+        assert params[8] == "/cookies.txt"
 
     def test_thumbnail_fallback(self):
         fmt = self._make_format()
@@ -159,6 +171,15 @@ class TestBestAudioResult:
         params = r.JsonRPCAction["parameters"]
         assert params[7] is False
 
+    def test_cookie_file_setting_in_params(self):
+        fmt = {"format_id": "140", "tbr": 128}
+        r = best_audio_result(
+            "http://example.com", None, fmt, "/downloads", "mp4", "mp3",
+            cookie_file_path="/cookies.txt"
+        )
+        params = r.JsonRPCAction["parameters"]
+        assert params[8] == "/cookies.txt"
+
 
 class TestQueryResult:
     def _make_format(self, **overrides):
@@ -193,10 +214,13 @@ class TestQueryResult:
 
     def test_audio_only_detection(self):
         fmt = self._make_format(resolution="audio only")
-        r = query_result("http://example.com", None, "Test Video", fmt,
-                         "/downloads", "mp4", "mp3")
+        r = query_result(
+            "http://example.com", None, "Test Video", fmt,
+            "/downloads", "mp4", "mp3", cookie_file_path="/cookies.txt"
+        )
         params = r.JsonRPCAction["parameters"]
         assert params[5] is True  # is_audio
+        assert params[8] == "/cookies.txt"
 
     def test_video_format_not_audio(self):
         fmt = self._make_format()
