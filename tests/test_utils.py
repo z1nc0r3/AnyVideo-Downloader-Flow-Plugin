@@ -22,6 +22,12 @@ class TestIsValidUrl:
     def test_url_with_path_and_params(self):
         assert utils.is_valid_url("https://example.com/path?q=1&b=2") is True
 
+    def test_long_tld(self):
+        assert utils.is_valid_url("https://example.technology/video") is True
+
+    def test_url_with_trailing_text(self):
+        assert utils.is_valid_url("https://example.com/video extra") is False
+
     def test_plain_text(self):
         assert utils.is_valid_url("not a url") is False
 
@@ -30,6 +36,21 @@ class TestIsValidUrl:
 
     def test_missing_scheme(self):
         assert utils.is_valid_url("example.com") is False
+
+
+# ---------------------------------------------------------------------------
+# has_extractable_url_target
+# ---------------------------------------------------------------------------
+
+class TestHasExtractableUrlTarget:
+    def test_bare_domain_is_false(self):
+        assert utils.has_extractable_url_target("https://youtube.com") is False
+
+    def test_domain_with_path_is_true(self):
+        assert utils.has_extractable_url_target("https://youtu.be/abc123") is True
+
+    def test_domain_with_query_is_true(self):
+        assert utils.has_extractable_url_target("https://youtube.com/watch?v=abc123") is True
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +89,15 @@ class TestSortByResolution:
         assert result[0]["resolution"] == "1920x1080"
         assert result[1]["resolution"] == "640x480"
 
+    def test_unknown_resolution_at_bottom(self):
+        formats = [
+            {"resolution": "unknown"},
+            {"resolution": "1280x720"},
+        ]
+        result = utils.sort_by_resolution(formats)
+        assert result[0]["resolution"] == "1280x720"
+        assert result[1]["resolution"] == "unknown"
+
 
 # ---------------------------------------------------------------------------
 # sort_by_tbr
@@ -82,6 +112,16 @@ class TestSortByTbr:
         ]
         result = utils.sort_by_tbr(formats)
         assert [f["tbr"] for f in result] == [500, 250, 100]
+
+    def test_missing_and_string_values_do_not_crash(self):
+        formats = [
+            {"tbr": None},
+            {"tbr": "500"},
+            {"tbr": "unknown"},
+            {},
+        ]
+        result = utils.sort_by_tbr(formats)
+        assert result[0]["tbr"] == "500"
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +149,15 @@ class TestSortByFps:
         assert result[1]["fps"] == 30
         assert result[2]["fps"] is None
 
+    def test_string_values_do_not_crash(self):
+        formats = [
+            {"fps": "not available"},
+            {"fps": "60"},
+            {"fps": None},
+        ]
+        result = utils.sort_by_fps(formats)
+        assert result[0]["fps"] == "60"
+
 
 # ---------------------------------------------------------------------------
 # sort_by_size
@@ -134,6 +183,15 @@ class TestSortBySize:
         assert result[0]["filesize"] == 5000
         assert result[1]["filesize"] == 1000
         assert result[2]["filesize"] is None
+
+    def test_string_values_do_not_crash(self):
+        formats = [
+            {"filesize": "unknown"},
+            {"filesize": "5000"},
+            {"filesize": None},
+        ]
+        result = utils.sort_by_size(formats)
+        assert result[0]["filesize"] == "5000"
 
 
 # ---------------------------------------------------------------------------

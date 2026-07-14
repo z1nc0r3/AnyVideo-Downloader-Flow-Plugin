@@ -14,6 +14,27 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LIB_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "lib"))
 LOCK_FILE = os.path.join(SCRIPT_DIR, "plugin_setup.lock")
 BIN_URL = "https://github.com/z1nc0r3/ffmpeg-binaries/blob/main/ffmpeg-bin.zip?raw=true"
+YT_DLP_LAST_CHECK = os.path.join(LIB_PATH, ".ytdlp_last_check")
+YT_DLP_LAST_SUCCESSFUL_UPDATE = os.path.join(
+    LIB_PATH, ".ytdlp_last_successful_update"
+)
+YT_DLP_LEGACY_UPDATE_MARKER = os.path.join(LIB_PATH, ".ytdlp_last_update")
+
+
+def safe_extract_zip(zip_ref, destination):
+    """Extract a zip file only when every member stays inside destination."""
+    destination = os.path.abspath(destination)
+
+    for member in zip_ref.infolist():
+        member_path = os.path.abspath(os.path.join(destination, member.filename))
+        try:
+            is_safe = os.path.commonpath([destination, member_path]) == destination
+        except ValueError:
+            is_safe = False
+        if not is_safe:
+            raise ValueError(f"Unsafe archive member path: {member.filename}")
+
+    zip_ref.extractall(destination)
 
 
 def is_ffmpeg_needed():
@@ -69,7 +90,7 @@ def download_ffmpeg():
                 os.remove(ffmpeg_zip)
                 return False
 
-            zip_ref.extractall(SCRIPT_DIR)
+            safe_extract_zip(zip_ref, SCRIPT_DIR)
 
         os.remove(ffmpeg_zip)
     except zipfile.BadZipFile:
@@ -110,10 +131,14 @@ def update_ytdlp():
     success, _ = download_ytdlp_from_pypi()
 
     if success:
-        update_marker = os.path.join(LIB_PATH, ".ytdlp_last_update")
         os.makedirs(LIB_PATH, exist_ok=True)
-        with open(update_marker, "w") as f:
-            f.write("updated")
+        for marker, value in (
+            (YT_DLP_LAST_CHECK, "checked"),
+            (YT_DLP_LAST_SUCCESSFUL_UPDATE, "updated"),
+            (YT_DLP_LEGACY_UPDATE_MARKER, "updated"),
+        ):
+            with open(marker, "w") as f:
+                f.write(value)
         return True
     else:
         return False

@@ -13,10 +13,15 @@ from pyflowlauncher import Plugin, ResultResponse, send_results
 from pyflowlauncher.settings import settings
 from utils import (
     is_valid_url,
+    has_extractable_url_target,
     sort_by_resolution,
     sort_by_tbr,
     sort_by_fps,
     sort_by_size,
+    resolution_value,
+    numeric_value,
+    log_message,
+    log_exception,
     verify_ffmpeg_binaries,
     verify_ffmpeg,
     extract_ffmpeg,
@@ -48,11 +53,119 @@ except ImportError:
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 CHECK_INTERVAL_DAYS = 7
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
+MAX_FORMAT_RESULTS = 40
 
 plugin = Plugin()
 
 
-def fetch_settings() -> Tuple[str, str, str, str, bool]:
+def _as_bool(value, default=False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return default
+
+
+def _normalize_download_path(download_path: str) -> str:
+    expanded = os.path.abspath(os.path.expanduser(os.path.expandvars(download_path)))
+    return expanded if os.path.exists(expanded) else DEFAULT_DOWNLOAD_PATH
+
+
+def _format_resolution(format_info):
+    resolution = format_info.get("resolution")
+    if resolution and resolution != "unknown":
+        return resolution
+
+    width = numeric_value(format_info.get("width"))
+    height = numeric_value(format_info.get("height"))
+    if width > 0 and height > 0:
+        return f"{int(width)}x{int(height)}"
+
+    if format_info.get("vcodec") == "none":
+        return "audio only"
+
+    return None
+
+
+def _append_format(formats, seen, format_info, allow_unknown=False):
+    format_id = format_info.get("format_id")
+    resolution = _format_resolution(format_info)
+    filesize = numeric_value(
+        format_info.get("filesize") or format_info.get("filesize_approx"), None
+    )
+    tbr = numeric_value(format_info.get("tbr"), None)
+    fps = numeric_value(format_info.get("fps"), None)
+    width = numeric_value(format_info.get("width"), None)
+    height = numeric_value(format_info.get("height"), None)
+
+    if not format_id:
+        return
+
+    if not resolution and allow_unknown and format_info.get("url"):
+        resolution = "unknown"
+
+    if not resolution:
+        return
+    if not allow_unknown and not tbr and not filesize:
+        return
+
+    normalized = {
+        "format_id": format_id,
+        "resolution": resolution,
+        "filesize": filesize,
+        "tbr": tbr,
+        "fps": fps,
+        "width": width,
+        "height": height,
+        "vcodec": format_info.get("vcodec"),
+        "acodec": format_info.get("acodec"),
+        "ext": format_info.get("ext"),
+    }
+    dedupe_key = (
+        normalized["format_id"],
+        normalized["resolution"],
+        normalized["tbr"],
+        normalized["filesize"],
+        normalized["fps"],
+    )
+    if dedupe_key in seen:
+        return
+
+    seen.add(dedupe_key)
+    formats.append(normalized)
+
+
+def _get_raw_formats(info):
+    raw_formats = info.get("formats") or []
+    if not isinstance(raw_formats, (list, tuple)):
+        raw_formats = []
+
+    if not raw_formats and info.get("format_id") and info.get("url"):
+        raw_formats = [info]
+
+    return raw_formats
+
+
+def _build_formats(info):
+    formats = []
+    seen = set()
+    raw_formats = _get_raw_formats(info)
+
+    for format_info in raw_formats:
+        if not isinstance(format_info, dict):
+            continue
+        _append_format(formats, seen, format_info)
+
+    if not formats:
+        for format_info in raw_formats:
+            if not isinstance(format_info, dict):
+                continue
+            _append_format(formats, seen, format_info, allow_unknown=True)
+
+    return formats
+
+
+def fetch_settings() -> Tuple[str, str, str, str, bool, bool]:
     """
     Fetches the user settings for the plugin.
 
@@ -63,22 +176,28 @@ def fetch_settings() -> Tuple[str, str, str, str, bool]:
             - pref_video_format (str): The preferred video format (default is "mp4").
             - pref_audio_format (str): The preferred audio format (default is "mp3").
             - auto_open_folder (bool): Whether to automatically open the download folder after download.
+            - overwrite_existing_files (bool): Whether to overwrite duplicate filenames.
     """
     try:
-        download_path = settings().get("download_path") or DEFAULT_DOWNLOAD_PATH
-        if not os.path.exists(download_path):
-            download_path = DEFAULT_DOWNLOAD_PATH
+        user_settings = settings()
+        download_path = _normalize_download_path(
+            user_settings.get("download_path") or DEFAULT_DOWNLOAD_PATH
+        )
 
-        sorting_order = settings().get("sorting_order") or "Resolution"
-        pref_video_format = settings().get("preferred_video_format") or "mp4"
-        pref_audio_format = settings().get("preferred_audio_format") or "mp3"
-        auto_open_folder = settings().get("auto_open_folder", True)
+        sorting_order = user_settings.get("sorting_order") or "Resolution"
+        pref_video_format = user_settings.get("preferred_video_format") or "mp4"
+        pref_audio_format = user_settings.get("preferred_audio_format") or "mp3"
+        auto_open_folder = _as_bool(user_settings.get("auto_open_folder", True), True)
+        overwrite_existing_files = _as_bool(
+            user_settings.get("overwrite_existing_files", True), True
+        )
     except Exception:
         download_path = DEFAULT_DOWNLOAD_PATH
         sorting_order = "Resolution"
         pref_video_format = "mp4"
         pref_audio_format = "mp3"
         auto_open_folder = False
+        overwrite_existing_files = True
 
     return (
         download_path,
@@ -86,12 +205,13 @@ def fetch_settings() -> Tuple[str, str, str, str, bool]:
         pref_video_format,
         pref_audio_format,
         auto_open_folder,
+        overwrite_existing_files,
     )
 
 
 @plugin.on_method
 def query(query: str) -> ResultResponse:
-    d_path, sort, pvf, paf, auto_open = fetch_settings()
+    d_path, sort, pvf, paf, auto_open, overwrite = fetch_settings()
 
     # Check if combined plugin setup is in progress
     plugin_setup_lock = os.path.join(PLUGIN_ROOT, "plugin_setup.lock")
@@ -149,44 +269,44 @@ def query(query: str) -> ResultResponse:
     if not is_valid_url(query):
         return send_results([invalid_result()])
 
-    query = query.replace("https://", "http://")
+    if not has_extractable_url_target(query):
+        return send_results([invalid_result()])
 
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "socket_timeout": 30,
+        "noplaylist": True,
     }
     ydl = CustomYoutubeDL(params=ydl_opts)
     info = ydl.extract_info(query)
 
     if info is None:
+        if ydl.error_message:
+            log_message(f"Failed to extract video information: {ydl.error_message}")
         return send_results([error_result()])
 
-    formats = [
-        {
-            "format_id": format.get("format_id"),
-            "resolution": format.get("resolution"),
-            "filesize": format.get("filesize"),
-            "tbr": format.get("tbr"),
-            "fps": format.get("fps"),
-        }
-        for format in info.get("formats", [])
-        if format.get("resolution") and format.get("tbr")
-    ]
+    formats = _build_formats(info)
 
     if not formats:
         if ydl.error_message:
             return send_results([error_result()])
         return send_results([empty_result()])
 
-    if sort == "Resolution":
+    try:
+        if sort == "Resolution":
+            formats = sort_by_resolution(formats)
+        elif sort == "File Size":
+            formats = sort_by_size(formats)
+        elif sort == "Total Bitrate":
+            formats = sort_by_tbr(formats)
+        elif sort == "FPS":
+            formats = sort_by_fps(formats)
+    except Exception as e:
+        log_exception("Failed to sort formats", e)
         formats = sort_by_resolution(formats)
-    elif sort == "File Size":
-        formats = sort_by_size(formats)
-    elif sort == "Total Bitrate":
-        formats = sort_by_tbr(formats)
-    elif sort == "FPS":
-        formats = sort_by_fps(formats)
+
+    formats = formats[:MAX_FORMAT_RESULTS]
 
     results = []
 
@@ -199,13 +319,17 @@ def query(query: str) -> ResultResponse:
     title = full_title[:50] + "..." if len(full_title) > 50 else full_title
 
     # Find best video (highest resolution, then highest bitrate)
-    video_formats = [f for f in formats if f.get("resolution") and f["resolution"] != "audio only"]
+    video_formats = [
+        f
+        for f in formats
+        if f.get("resolution") and f["resolution"] not in ("audio only", "unknown")
+    ]
     if video_formats:
         try:
             best_video = max(
                 video_formats,
                 key=lambda x: (
-                    tuple(map(int, x["resolution"].split("x"))) if x.get("resolution") and "x" in x["resolution"] else (0, 0),
+                    resolution_value(x),
                     x.get("tbr") or 0,
                 ),
             )
@@ -218,16 +342,17 @@ def query(query: str) -> ResultResponse:
                     pvf,
                     paf,
                     auto_open,
+                    overwrite,
                 )
             )
-        except (ValueError, TypeError):
-            pass  # Skip if we can't determine best video
+        except (ValueError, TypeError) as e:
+            log_exception("Failed to determine best video format", e)
 
     # Find best audio (highest bitrate)
     audio_formats = [f for f in formats if f.get("resolution") == "audio only"]
     if audio_formats:
         try:
-            best_audio = max(audio_formats, key=lambda x: x.get("tbr") or 0)
+            best_audio = max(audio_formats, key=lambda x: numeric_value(x.get("tbr")))
             results.append(
                 best_audio_result(
                     query,
@@ -237,10 +362,11 @@ def query(query: str) -> ResultResponse:
                     pvf,
                     paf,
                     auto_open,
+                    overwrite,
                 )
             )
-        except (ValueError, TypeError):
-            pass  # Skip if we can't determine best audio
+        except (ValueError, TypeError) as e:
+            log_exception("Failed to determine best audio format", e)
 
     results.extend(
         [
@@ -253,6 +379,7 @@ def query(query: str) -> ResultResponse:
                 pvf,
                 paf,
                 auto_open,
+                overwrite,
             )
             for format in formats
         ]
@@ -269,6 +396,7 @@ def download(
     pref_audio_path: str,
     is_audio: bool,
     auto_open_folder: bool = False,
+    overwrite_existing_files: bool = True,
 ) -> None:
     if check_ytdlp_version(CHECK_INTERVAL_DAYS):
         update_ytdlp_library()
@@ -321,13 +449,16 @@ def download(
         "--quiet",
         "--progress",
         "--no-mtime",
-        "--force-overwrites",
+        "--no-playlist",
         "--no-part",
         "--retries",
         "3",
         "--retry-sleep",
         "2",
     ]
+
+    if overwrite_existing_files:
+        command.append("--force-overwrites")
 
     if ffmpeg_path:
         command += ["--ffmpeg-location", ffmpeg_path]
@@ -340,8 +471,8 @@ def download(
         result = subprocess.run(command)
         if result.returncode == 0 and auto_open_folder and os.path.isdir(download_path):
             os.startfile(download_path)
-    except Exception:
-        pass
+    except Exception as e:
+        log_exception("Download command failed", e)
 
 
 if __name__ == "__main__":

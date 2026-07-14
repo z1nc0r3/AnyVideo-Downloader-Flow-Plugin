@@ -64,12 +64,14 @@ class TestDownloadYtdlpFromPypi:
         mock_zip.__exit__ = MagicMock(return_value=False)
         mock_zipfile.return_value = mock_zip
 
-        with patch("builtins.open", mock_open()):
+        with patch("update_ytdlp._install_from_temp", return_value=(True, None)) as mock_install, \
+             patch("builtins.open", mock_open()):
             ok, result = update_ytdlp.download_ytdlp_from_pypi()
 
         assert ok is True
         assert result == "2024.12.01"
         mock_zip.extractall.assert_called_once()
+        mock_install.assert_called_once()
 
     @patch("update_ytdlp.urlopen", side_effect=URLError("timeout"))
     def test_network_error(self, mock_urlopen):
@@ -157,13 +159,12 @@ class TestDownloadYtdlpFromPypi:
         mock_zip.__exit__ = MagicMock(return_value=False)
         mock_zipfile.return_value = mock_zip
 
-        with patch("builtins.open", mock_open()):
+        with patch("update_ytdlp._install_from_temp", return_value=(True, None)) as mock_install, \
+             patch("builtins.open", mock_open()):
             ok, result = update_ytdlp.download_ytdlp_from_pypi()
 
         assert ok is True
-        # rmtree called for old dist-info from glob
-        rmtree_paths = [str(c) for c in mock_rmtree.call_args_list]
-        assert any("dist-info" in p for p in rmtree_paths)
+        mock_install.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

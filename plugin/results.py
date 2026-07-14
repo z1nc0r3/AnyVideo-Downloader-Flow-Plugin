@@ -65,6 +65,7 @@ def best_video_result(
     pref_video_path,
     pref_audio_path,
     auto_open_folder=False,
+    overwrite_existing_files=True,
 ) -> Result:
     result_title = "★ BEST VIDEO QUALITY"
     if format.get("resolution"):
@@ -83,6 +84,7 @@ def best_video_result(
                 pref_audio_path,
                 False,
                 auto_open_folder,
+                overwrite_existing_files,
             ],
         },
     )
@@ -96,6 +98,7 @@ def best_audio_result(
     pref_video_path,
     pref_audio_path,
     auto_open_folder=False,
+    overwrite_existing_files=True,
 ) -> Result:
     result_title = "★ BEST AUDIO ONLY"
     if format.get("tbr"):
@@ -114,6 +117,7 @@ def best_audio_result(
                 pref_audio_path,
                 True,
                 auto_open_folder,
+                overwrite_existing_files,
             ],
         },
     )
@@ -128,6 +132,7 @@ def query_result(
     pref_video_path,
     pref_audio_path,
     auto_open_folder=False,
+    overwrite_existing_files=True,
 ) -> Result:
     # Build subtitle with consistent spacing
     subtitle_parts = [f"Res: {format['resolution']}"]
@@ -158,6 +163,7 @@ def query_result(
                 pref_audio_path,
                 format["resolution"] == "audio only",
                 auto_open_folder,
+                overwrite_existing_files,
             ],
         },
     )
