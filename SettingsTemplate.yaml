@@ -54,3 +54,15 @@ body:
           label: "Overwrite existing files"
           defaultValue: true
           description: "Replace existing files with the same output filename."
+    - type: checkbox
+      attributes:
+          name: use_cookie_file
+          label: "Use cookies.txt file"
+          defaultValue: false
+          description: "Pass a configured cookies.txt file to yt-dlp."
+    - type: input
+      attributes:
+          name: cookie_file_path
+          label: "Cookies.txt file path:"
+          description: "Optional path to a Netscape-format cookies.txt file."
+          defaultValue: ""
