@@ -127,6 +127,20 @@ def _format_resolution(format_info):
     return None
 
 
+def _is_media_format(format_info) -> bool:
+    ext = str(format_info.get("ext") or "").lower()
+    protocol = str(format_info.get("protocol") or "").lower()
+    format_note = str(format_info.get("format_note") or "").lower()
+
+    if ext == "mhtml" or protocol == "mhtml" or "storyboard" in format_note:
+        return False
+
+    return not (
+        format_info.get("vcodec") == "none"
+        and format_info.get("acodec") == "none"
+    )
+
+
 def _append_format(formats, seen, format_info, allow_unknown=False):
     format_id = format_info.get("format_id")
     resolution = _format_resolution(format_info)
@@ -138,7 +152,7 @@ def _append_format(formats, seen, format_info, allow_unknown=False):
     width = numeric_value(format_info.get("width"), None)
     height = numeric_value(format_info.get("height"), None)
 
-    if not format_id:
+    if not format_id or not _is_media_format(format_info):
         return
 
     if not resolution and allow_unknown and format_info.get("url"):
@@ -178,7 +192,10 @@ def _append_format(formats, seen, format_info, allow_unknown=False):
 def _get_raw_formats(info):
     raw_formats = info.get("formats") or []
     if not isinstance(raw_formats, (list, tuple)):
-        raw_formats = []
+        try:
+            raw_formats = list(raw_formats)
+        except TypeError:
+            raw_formats = []
 
     if not raw_formats and info.get("format_id") and info.get("url"):
         raw_formats = [info]
