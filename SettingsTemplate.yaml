@@ -1,5 +1,5 @@
 body:
-    - type: input
+    - type: inputWithFolderBtn
       attributes:
           name: download_path
           label: "Download path:"
