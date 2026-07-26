@@ -60,7 +60,7 @@ body:
           label: "Use cookies.txt file"
           defaultValue: false
           description: "Pass a configured cookies.txt file to yt-dlp."
-    - type: inputWithFolderBtn
+    - type: inputWithFileBtn
       attributes:
           name: cookie_file_path
           label: "Cookies.txt file path:"
