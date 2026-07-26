@@ -4,6 +4,7 @@
 # Date: 2024-07-28
 
 import os
+import shutil
 import subprocess
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -103,6 +104,7 @@ def _build_ydl_opts(cookie_file_path: str = ""):
         "no_warnings": True,
         "socket_timeout": 30,
         "noplaylist": True,
+        "ignore_no_formats_error": True,
     }
     if cookie_file_path:
         ydl_opts["cookiefile"] = cookie_file_path
@@ -332,8 +334,15 @@ def query(query: str) -> ResultResponse:
             [cookie_file_error_result(plugin_settings.cookie_file_error)]
         )
 
-    ydl = CustomYoutubeDL(params=_build_ydl_opts(plugin_settings.cookie_file_path))
-    info = ydl.extract_info(query)
+    active_cookie_file_path = plugin_settings.cookie_file_path
+    ydl = CustomYoutubeDL(params=_build_ydl_opts(active_cookie_file_path))
+    info = ydl.extract_info(query, download=False)
+
+    if info is None:
+        if active_cookie_file_path:
+            active_cookie_file_path = ""
+            ydl = CustomYoutubeDL(params=_build_ydl_opts())
+            info = ydl.extract_info(query, download=False)
 
     if info is None:
         if ydl.error_message:
@@ -342,8 +351,19 @@ def query(query: str) -> ResultResponse:
 
     formats = _build_formats(info)
 
+    if active_cookie_file_path and not formats and _get_raw_formats(info or {}):
+        fallback_ydl = CustomYoutubeDL(params=_build_ydl_opts())
+        fallback_info = fallback_ydl.extract_info(query, download=False)
+        fallback_formats = _build_formats(fallback_info or {})
+        if fallback_info is not None and fallback_formats:
+            ydl = fallback_ydl
+            info = fallback_info
+            formats = fallback_formats
+            active_cookie_file_path = ""
+
     if not formats:
         if ydl.error_message:
+            log_message(f"Failed to build formats: {ydl.error_message}")
             return send_results([error_result()])
         return send_results([empty_result()])
 
@@ -397,7 +417,7 @@ def query(query: str) -> ResultResponse:
                     plugin_settings.preferred_audio_format,
                     plugin_settings.auto_open_folder,
                     plugin_settings.overwrite_existing_files,
-                    plugin_settings.cookie_file_path,
+                    active_cookie_file_path,
                 )
             )
         except (ValueError, TypeError) as e:
@@ -418,7 +438,7 @@ def query(query: str) -> ResultResponse:
                     plugin_settings.preferred_audio_format,
                     plugin_settings.auto_open_folder,
                     plugin_settings.overwrite_existing_files,
-                    plugin_settings.cookie_file_path,
+                    active_cookie_file_path,
                 )
             )
         except (ValueError, TypeError) as e:
@@ -436,7 +456,7 @@ def query(query: str) -> ResultResponse:
                 plugin_settings.preferred_audio_format,
                 plugin_settings.auto_open_folder,
                 plugin_settings.overwrite_existing_files,
-                plugin_settings.cookie_file_path,
+                active_cookie_file_path,
             )
             for format in formats
         ]
