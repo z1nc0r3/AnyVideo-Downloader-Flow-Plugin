@@ -93,6 +93,10 @@ def _resolve_cookie_file_settings(user_settings) -> Tuple[str, str]:
     return cookie_file_path, ""
 
 
+def _node_js_runtime_available() -> bool:
+    return shutil.which("node") is not None
+
+
 def _build_ydl_opts(cookie_file_path: str = ""):
     ydl_opts = {
         "quiet": True,
@@ -102,6 +106,8 @@ def _build_ydl_opts(cookie_file_path: str = ""):
     }
     if cookie_file_path:
         ydl_opts["cookiefile"] = cookie_file_path
+    if _node_js_runtime_available():
+        ydl_opts["js_runtimes"] = {"node": {}}
     return ydl_opts
 
 
@@ -503,6 +509,9 @@ def download(
             log_message(
                 f"Configured cookie file not found during download: {cookie_file_path}"
             )
+
+    if _node_js_runtime_available():
+        command += ["--js-runtimes", "node"]
 
     if ffmpeg_path:
         command += ["--ffmpeg-location", ffmpeg_path]
