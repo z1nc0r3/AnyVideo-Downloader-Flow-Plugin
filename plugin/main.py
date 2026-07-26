@@ -4,14 +4,18 @@
 # Date: 2024-07-28
 
 import os
+import shutil
 import subprocess
 from datetime import datetime, timedelta
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple
 
 from pyflowlauncher import Plugin, ResultResponse, send_results
 from pyflowlauncher.settings import settings
 from utils import (
+    as_bool,
+    normalize_path,
     is_valid_url,
     has_extractable_url_target,
     sort_by_resolution,
@@ -35,6 +39,7 @@ from results import (
     invalid_result,
     error_result,
     empty_result,
+    cookie_file_error_result,
     query_result,
     best_video_result,
     best_audio_result,
@@ -58,17 +63,54 @@ MAX_FORMAT_RESULTS = 40
 plugin = Plugin()
 
 
-def _as_bool(value, default=False) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        return value.strip().lower() in ("1", "true", "yes", "on")
-    return default
+@dataclass(frozen=True)
+class PluginSettings:
+    download_path: str
+    sorting_order: str
+    preferred_video_format: str
+    preferred_audio_format: str
+    auto_open_folder: bool
+    overwrite_existing_files: bool
+    cookie_file_path: str = ""
+    cookie_file_error: str = ""
 
 
 def _normalize_download_path(download_path: str) -> str:
-    expanded = os.path.abspath(os.path.expanduser(os.path.expandvars(download_path)))
+    expanded = normalize_path(download_path)
     return expanded if os.path.exists(expanded) else DEFAULT_DOWNLOAD_PATH
+
+
+def _resolve_cookie_file_settings(user_settings) -> Tuple[str, str]:
+    if not as_bool(user_settings.get("use_cookie_file", False), False):
+        return "", ""
+
+    cookie_file_path = normalize_path(user_settings.get("cookie_file_path") or "")
+    if not cookie_file_path:
+        return "", "Cookie file support is enabled, but no cookies.txt path is configured."
+
+    if not os.path.isfile(cookie_file_path):
+        return "", f"Cookie file not found: {cookie_file_path}"
+
+    return cookie_file_path, ""
+
+
+def _node_js_runtime_available() -> bool:
+    return shutil.which("node") is not None
+
+
+def _build_ydl_opts(cookie_file_path: str = ""):
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "socket_timeout": 30,
+        "noplaylist": True,
+        "ignore_no_formats_error": True,
+    }
+    if cookie_file_path:
+        ydl_opts["cookiefile"] = cookie_file_path
+    if _node_js_runtime_available():
+        ydl_opts["js_runtimes"] = {"node": {}}
+    return ydl_opts
 
 
 def _format_resolution(format_info):
@@ -87,6 +129,20 @@ def _format_resolution(format_info):
     return None
 
 
+def _is_media_format(format_info) -> bool:
+    ext = str(format_info.get("ext") or "").lower()
+    protocol = str(format_info.get("protocol") or "").lower()
+    format_note = str(format_info.get("format_note") or "").lower()
+
+    if ext == "mhtml" or protocol == "mhtml" or "storyboard" in format_note:
+        return False
+
+    return not (
+        format_info.get("vcodec") == "none"
+        and format_info.get("acodec") == "none"
+    )
+
+
 def _append_format(formats, seen, format_info, allow_unknown=False):
     format_id = format_info.get("format_id")
     resolution = _format_resolution(format_info)
@@ -98,7 +154,7 @@ def _append_format(formats, seen, format_info, allow_unknown=False):
     width = numeric_value(format_info.get("width"), None)
     height = numeric_value(format_info.get("height"), None)
 
-    if not format_id:
+    if not format_id or not _is_media_format(format_info):
         return
 
     if not resolution and allow_unknown and format_info.get("url"):
@@ -138,7 +194,10 @@ def _append_format(formats, seen, format_info, allow_unknown=False):
 def _get_raw_formats(info):
     raw_formats = info.get("formats") or []
     if not isinstance(raw_formats, (list, tuple)):
-        raw_formats = []
+        try:
+            raw_formats = list(raw_formats)
+        except TypeError:
+            raw_formats = []
 
     if not raw_formats and info.get("format_id") and info.get("url"):
         raw_formats = [info]
@@ -165,18 +224,9 @@ def _build_formats(info):
     return formats
 
 
-def fetch_settings() -> Tuple[str, str, str, str, bool, bool]:
+def fetch_settings() -> PluginSettings:
     """
     Fetches the user settings for the plugin.
-
-    Returns:
-        Tuple[str, str, str, str, bool]: A tuple containing:
-            - download_path (str): The path where videos will be downloaded.
-            - sorting_order (str): The order in which videos will be sorted (default is "Resolution").
-            - pref_video_format (str): The preferred video format (default is "mp4").
-            - pref_audio_format (str): The preferred audio format (default is "mp3").
-            - auto_open_folder (bool): Whether to automatically open the download folder after download.
-            - overwrite_existing_files (bool): Whether to overwrite duplicate filenames.
     """
     try:
         user_settings = settings()
@@ -187,9 +237,12 @@ def fetch_settings() -> Tuple[str, str, str, str, bool, bool]:
         sorting_order = user_settings.get("sorting_order") or "Resolution"
         pref_video_format = user_settings.get("preferred_video_format") or "mp4"
         pref_audio_format = user_settings.get("preferred_audio_format") or "mp3"
-        auto_open_folder = _as_bool(user_settings.get("auto_open_folder", True), True)
-        overwrite_existing_files = _as_bool(
+        auto_open_folder = as_bool(user_settings.get("auto_open_folder", True), True)
+        overwrite_existing_files = as_bool(
             user_settings.get("overwrite_existing_files", True), True
+        )
+        cookie_file_path, cookie_file_error = _resolve_cookie_file_settings(
+            user_settings
         )
     except Exception:
         download_path = DEFAULT_DOWNLOAD_PATH
@@ -198,20 +251,24 @@ def fetch_settings() -> Tuple[str, str, str, str, bool, bool]:
         pref_audio_format = "mp3"
         auto_open_folder = False
         overwrite_existing_files = True
+        cookie_file_path = ""
+        cookie_file_error = ""
 
-    return (
-        download_path,
-        sorting_order,
-        pref_video_format,
-        pref_audio_format,
-        auto_open_folder,
-        overwrite_existing_files,
+    return PluginSettings(
+        download_path=download_path,
+        sorting_order=sorting_order,
+        preferred_video_format=pref_video_format,
+        preferred_audio_format=pref_audio_format,
+        auto_open_folder=auto_open_folder,
+        overwrite_existing_files=overwrite_existing_files,
+        cookie_file_path=cookie_file_path,
+        cookie_file_error=cookie_file_error,
     )
 
 
 @plugin.on_method
 def query(query: str) -> ResultResponse:
-    d_path, sort, pvf, paf, auto_open, overwrite = fetch_settings()
+    plugin_settings = fetch_settings()
 
     # Check if combined plugin setup is in progress
     plugin_setup_lock = os.path.join(PLUGIN_ROOT, "plugin_setup.lock")
@@ -264,7 +321,7 @@ def query(query: str) -> ResultResponse:
         return send_results([plugin_setup_in_progress_result()])
 
     if not query.strip():
-        return send_results([init_results(d_path)])
+        return send_results([init_results(plugin_settings.download_path)])
 
     if not is_valid_url(query):
         return send_results([invalid_result()])
@@ -272,14 +329,20 @@ def query(query: str) -> ResultResponse:
     if not has_extractable_url_target(query):
         return send_results([invalid_result()])
 
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "socket_timeout": 30,
-        "noplaylist": True,
-    }
-    ydl = CustomYoutubeDL(params=ydl_opts)
-    info = ydl.extract_info(query)
+    if plugin_settings.cookie_file_error:
+        return send_results(
+            [cookie_file_error_result(plugin_settings.cookie_file_error)]
+        )
+
+    active_cookie_file_path = plugin_settings.cookie_file_path
+    ydl = CustomYoutubeDL(params=_build_ydl_opts(active_cookie_file_path))
+    info = ydl.extract_info(query, download=False)
+
+    if info is None:
+        if active_cookie_file_path:
+            active_cookie_file_path = ""
+            ydl = CustomYoutubeDL(params=_build_ydl_opts())
+            info = ydl.extract_info(query, download=False)
 
     if info is None:
         if ydl.error_message:
@@ -288,19 +351,30 @@ def query(query: str) -> ResultResponse:
 
     formats = _build_formats(info)
 
+    if active_cookie_file_path and not formats and _get_raw_formats(info or {}):
+        fallback_ydl = CustomYoutubeDL(params=_build_ydl_opts())
+        fallback_info = fallback_ydl.extract_info(query, download=False)
+        fallback_formats = _build_formats(fallback_info or {})
+        if fallback_info is not None and fallback_formats:
+            ydl = fallback_ydl
+            info = fallback_info
+            formats = fallback_formats
+            active_cookie_file_path = ""
+
     if not formats:
         if ydl.error_message:
+            log_message(f"Failed to build formats: {ydl.error_message}")
             return send_results([error_result()])
         return send_results([empty_result()])
 
     try:
-        if sort == "Resolution":
+        if plugin_settings.sorting_order == "Resolution":
             formats = sort_by_resolution(formats)
-        elif sort == "File Size":
+        elif plugin_settings.sorting_order == "File Size":
             formats = sort_by_size(formats)
-        elif sort == "Total Bitrate":
+        elif plugin_settings.sorting_order == "Total Bitrate":
             formats = sort_by_tbr(formats)
-        elif sort == "FPS":
+        elif plugin_settings.sorting_order == "FPS":
             formats = sort_by_fps(formats)
     except Exception as e:
         log_exception("Failed to sort formats", e)
@@ -338,11 +412,12 @@ def query(query: str) -> ResultResponse:
                     query,
                     thumbnail,
                     best_video,
-                    d_path,
-                    pvf,
-                    paf,
-                    auto_open,
-                    overwrite,
+                    plugin_settings.download_path,
+                    plugin_settings.preferred_video_format,
+                    plugin_settings.preferred_audio_format,
+                    plugin_settings.auto_open_folder,
+                    plugin_settings.overwrite_existing_files,
+                    active_cookie_file_path,
                 )
             )
         except (ValueError, TypeError) as e:
@@ -358,11 +433,12 @@ def query(query: str) -> ResultResponse:
                     query,
                     thumbnail,
                     best_audio,
-                    d_path,
-                    pvf,
-                    paf,
-                    auto_open,
-                    overwrite,
+                    plugin_settings.download_path,
+                    plugin_settings.preferred_video_format,
+                    plugin_settings.preferred_audio_format,
+                    plugin_settings.auto_open_folder,
+                    plugin_settings.overwrite_existing_files,
+                    active_cookie_file_path,
                 )
             )
         except (ValueError, TypeError) as e:
@@ -375,11 +451,12 @@ def query(query: str) -> ResultResponse:
                 thumbnail,
                 title,
                 format,
-                d_path,
-                pvf,
-                paf,
-                auto_open,
-                overwrite,
+                plugin_settings.download_path,
+                plugin_settings.preferred_video_format,
+                plugin_settings.preferred_audio_format,
+                plugin_settings.auto_open_folder,
+                plugin_settings.overwrite_existing_files,
+                active_cookie_file_path,
             )
             for format in formats
         ]
@@ -397,6 +474,7 @@ def download(
     is_audio: bool,
     auto_open_folder: bool = False,
     overwrite_existing_files: bool = True,
+    cookie_file_path: str = "",
 ) -> None:
     if check_ytdlp_version(CHECK_INTERVAL_DAYS):
         update_ytdlp_library()
@@ -459,6 +537,18 @@ def download(
 
     if overwrite_existing_files:
         command.append("--force-overwrites")
+
+    cookie_file_path = normalize_path(cookie_file_path)
+    if cookie_file_path:
+        if os.path.isfile(cookie_file_path):
+            command += ["--cookies", cookie_file_path]
+        else:
+            log_message(
+                f"Configured cookie file not found during download: {cookie_file_path}"
+            )
+
+    if _node_js_runtime_available():
+        command += ["--js-runtimes", "node"]
 
     if ffmpeg_path:
         command += ["--ffmpeg-location", ffmpeg_path]
