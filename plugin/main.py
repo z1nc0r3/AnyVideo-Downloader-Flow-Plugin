@@ -9,10 +9,14 @@ import subprocess
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
+from typing import Any, Tuple
 
-from pyflowlauncher import Plugin, ResultResponse, send_results
+from pyflowlauncher import Plugin, send_results
 from pyflowlauncher.settings import settings
+try:
+    from pyflowlauncher.models.json_rpc import JsonRPCResponse as ResultResponse
+except Exception:
+    ResultResponse = Any
 from utils import (
     as_bool,
     normalize_path,
