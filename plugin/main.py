@@ -9,14 +9,10 @@ import subprocess
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Tuple
+from typing import Tuple
 
 from pyflowlauncher import Plugin, send_results
-from pyflowlauncher.settings import settings
-try:
-    from pyflowlauncher.models.json_rpc import JsonRPCResponse as ResultResponse
-except Exception:
-    ResultResponse = Any
+from pyflowlauncher.models.json_rpc import JsonRPCResponse as ResultResponse
 from utils import (
     as_bool,
     normalize_path,
@@ -233,7 +229,7 @@ def fetch_settings() -> PluginSettings:
     Fetches the user settings for the plugin.
     """
     try:
-        user_settings = settings()
+        user_settings = plugin.settings
         download_path = _normalize_download_path(
             user_settings.get("download_path") or DEFAULT_DOWNLOAD_PATH
         )

@@ -1,67 +1,78 @@
 from pyflowlauncher import Result
 
 
+DOWNLOAD_METHOD = "download"
+
+
+def _download_action(parameters):
+    return {
+        "Method": DOWNLOAD_METHOD,
+        "Parameters": parameters,
+        "DontHideAfterAction": False,
+    }
+
+
 def init_results(download_path) -> Result:
     return Result(
-        Title="Please input the video URL",
-        SubTitle=f"Download path: {download_path}",
-        IcoPath="Images/app.png",
+        title="Please input the video URL",
+        subtitle=f"Download path: {download_path}",
+        icon="Images/app.png",
     )
 
 
 def invalid_result() -> Result:
-    return Result(Title="Please check the URL for errors.", IcoPath="Images/error.png")
+    return Result(title="Please check the URL for errors.", icon="Images/error.png")
 
 
 def ffmpeg_not_found_result() -> Result:
     return Result(
-        Title="FFmpeg binaries not found!",
-        SubTitle="Some features may not work as expected.",
-        IcoPath="Images/error.png",
+        title="FFmpeg binaries not found!",
+        subtitle="Some features may not work as expected.",
+        icon="Images/error.png",
     )
 
 
 def error_result() -> Result:
     return Result(
-        Title="Something went wrong!",
-        SubTitle=f"Couldn't extract video information.",
-        IcoPath="Images/error.png",
+        title="Something went wrong!",
+        subtitle="Couldn't extract video information.",
+        icon="Images/error.png",
     )
 
 
 def empty_result() -> Result:
-    return Result(Title="Couldn't find any video formats.", IcoPath="Images/error.png")
+    return Result(title="Couldn't find any video formats.", icon="Images/error.png")
 
 
 def cookie_file_error_result(issue) -> Result:
     return Result(
-        Title="Cookie file setting needs attention",
-        SubTitle=issue or "Please check the configured cookies.txt path.",
-        IcoPath="Images/error.png",
+        title="Cookie file setting needs attention",
+        subtitle=issue or "Please check the configured cookies.txt path.",
+        icon="Images/error.png",
     )
 
 
 def ffmpeg_setup_result(issue) -> Result:
     return Result(
-        Title="FFmpeg setup in progress...",
-        SubTitle=issue or "Please wait a few seconds and try again.",
-        IcoPath="Images/error.png",
+        title="FFmpeg setup in progress...",
+        subtitle=issue or "Please wait a few seconds and try again.",
+        icon="Images/error.png",
     )
 
 
 def plugin_setup_in_progress_result() -> Result:
     return Result(
-        Title="Plugin setup in progress...",
-        SubTitle="FFmpeg and yt-dlp are being installed. Please wait and try again.",
-        IcoPath="Images/app.png",
+        title="Plugin setup in progress...",
+        subtitle="FFmpeg and yt-dlp are being installed. Please wait and try again.",
+        icon="Images/app.png",
     )
 
 
 def ytdlp_update_in_progress_result() -> Result:
     return Result(
-        Title="yt-dlp is being updated...",
-        SubTitle="Please wait a moment and try again.",
-        IcoPath="Images/app.png",
+        title="yt-dlp is being updated...",
+        subtitle="Please wait a moment and try again.",
+        icon="Images/app.png",
     )
 
 
@@ -76,16 +87,15 @@ def best_video_result(
     overwrite_existing_files=True,
     cookie_file_path="",
 ) -> Result:
-    result_title = "★ BEST VIDEO QUALITY"
+    result_title = "\u2605 BEST VIDEO QUALITY"
     if format.get("resolution"):
-        result_title = f"★ BEST VIDEO QUALITY [{format['resolution']}]"
+        result_title = f"\u2605 BEST VIDEO QUALITY [{format['resolution']}]"
 
     return Result(
-        Title=result_title,
-        IcoPath=thumbnail or "Images/app.png",
-        JsonRPCAction={
-            "method": "download",
-            "parameters": [
+        title=result_title,
+        icon=thumbnail or "Images/app.png",
+        json_rpc_action=_download_action(
+            [
                 query,
                 f"{format['format_id']}",
                 download_path,
@@ -95,8 +105,8 @@ def best_video_result(
                 auto_open_folder,
                 overwrite_existing_files,
                 cookie_file_path,
-            ],
-        },
+            ]
+        ),
     )
 
 
@@ -111,16 +121,15 @@ def best_audio_result(
     overwrite_existing_files=True,
     cookie_file_path="",
 ) -> Result:
-    result_title = "★ BEST AUDIO ONLY"
+    result_title = "\u2605 BEST AUDIO ONLY"
     if format.get("tbr"):
-        result_title = f"★ BEST AUDIO ONLY ({round(format['tbr'], 2)} kbps)"
+        result_title = f"\u2605 BEST AUDIO ONLY ({round(format['tbr'], 2)} kbps)"
 
     return Result(
-        Title=result_title,
-        IcoPath=thumbnail or "Images/app.png",
-        JsonRPCAction={
-            "method": "download",
-            "parameters": [
+        title=result_title,
+        icon=thumbnail or "Images/app.png",
+        json_rpc_action=_download_action(
+            [
                 query,
                 f"{format['format_id']}",
                 download_path,
@@ -130,8 +139,8 @@ def best_audio_result(
                 auto_open_folder,
                 overwrite_existing_files,
                 cookie_file_path,
-            ],
-        },
+            ]
+        ),
     )
 
 
@@ -147,7 +156,6 @@ def query_result(
     overwrite_existing_files=True,
     cookie_file_path="",
 ) -> Result:
-    # Build subtitle with consistent spacing
     subtitle_parts = [f"Res: {format['resolution']}"]
 
     if format.get("tbr") is not None:
@@ -160,15 +168,12 @@ def query_result(
     if format.get("fps"):
         subtitle_parts.append(f"FPS: {int(format['fps'])}")
 
-    subtitle = " ┃ ".join(subtitle_parts)
-
     return Result(
-        Title=title,
-        SubTitle=subtitle,
-        IcoPath=thumbnail or "Images/app.png",
-        JsonRPCAction={
-            "method": "download",
-            "parameters": [
+        title=title,
+        subtitle=" \u2503 ".join(subtitle_parts),
+        icon=thumbnail or "Images/app.png",
+        json_rpc_action=_download_action(
+            [
                 query,
                 f"{format['format_id']}",
                 download_path,
@@ -178,6 +183,6 @@ def query_result(
                 auto_open_folder,
                 overwrite_existing_files,
                 cookie_file_path,
-            ],
-        },
+            ]
+        ),
     )
