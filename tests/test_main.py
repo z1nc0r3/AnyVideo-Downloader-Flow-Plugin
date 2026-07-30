@@ -296,9 +296,9 @@ class TestQueryExtraction:
 
         assert results
         assert all(
-            result.JsonRPCAction["parameters"][8] == ""
+            result.json_rpc_action["Parameters"][8] == ""
             for result in results
-            if result.JsonRPCAction
+            if result.json_rpc_action
         )
 
     def test_query_does_not_retry_without_cookies_when_no_raw_formats(
@@ -345,7 +345,7 @@ class TestQueryExtraction:
 
         results = main.query("https://www.youtube.com/watch?v=empty")
 
-        assert "formats" in results[0].Title.lower()
+        assert "formats" in results[0].title.lower()
         assert calls == [str(cookie_file)]
 
 class TestBuildFormats:
