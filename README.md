@@ -1,4 +1,4 @@
-# AnyVideo Downloader v2.5.1 - [2026-July-29]  🔻
+# AnyVideo Downloader v2.5.2 - [2026-July-30]  🔻
 
 
 ![](https://github.com/user-attachments/assets/18a6cff4-ee86-4322-a72d-c6a02628503a)
@@ -33,10 +33,6 @@
 - Insert the URL of the video you want to download
 - Select the video format you need
 - It'll open a separate terminal which continues the download
-
-
-## Upcoming features 💚
-- [ ]  Simple mode for quick downloads - This will allow users to download video/audio with the best quality available without any additional settings
 
 
 ## Contribution 🤝
