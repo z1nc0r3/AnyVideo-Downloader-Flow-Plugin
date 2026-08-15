@@ -237,6 +237,83 @@ def _format_duration(seconds: float) -> str:
     return str(round(seconds, 3))
 
 
+def _ffmpeg_exe_path(ffmpeg_path: str) -> str:
+    return os.path.join(ffmpeg_path, "ffmpeg.exe") if ffmpeg_path else "ffmpeg"
+
+
+def _trimmed_output_path(source_path: str, overwrite_existing_files: bool) -> str:
+    source = Path(source_path)
+    output = source.with_name(f"{source.stem} - trimmed{source.suffix}")
+    if overwrite_existing_files or not output.exists():
+        return str(output)
+
+    index = 1
+    while True:
+        candidate = source.with_name(f"{source.stem} - trimmed ({index}){source.suffix}")
+        if not candidate.exists():
+            return str(candidate)
+        index += 1
+
+
+def _run_post_trim(
+    final_path: str,
+    start_time: str,
+    end_time: str,
+    ffmpeg_path: str,
+    overwrite_existing_files: bool,
+    delete_original_after_trim: bool,
+) -> bool:
+    final_path = normalize_path(final_path)
+    if not os.path.isfile(final_path):
+        log_message(f"Post-trim skipped. Downloaded file not found: {final_path}")
+        return False
+
+    start_seconds = _timestamp_seconds(start_time)
+    end_seconds = _timestamp_seconds(end_time, allow_inf=True)
+    if start_seconds is None or end_seconds is None:
+        log_message(f"Post-trim skipped. Invalid time range: {start_time}-{end_time}")
+        return False
+    if end_seconds != float("inf") and end_seconds <= start_seconds:
+        log_message(f"Post-trim skipped. Invalid time range: {start_time}-{end_time}")
+        return False
+
+    output_path = _trimmed_output_path(final_path, overwrite_existing_files)
+    if os.path.abspath(final_path) == os.path.abspath(output_path):
+        log_message(f"Post-trim skipped. Output path matches input path: {final_path}")
+        return False
+
+    command = [
+        _ffmpeg_exe_path(ffmpeg_path),
+        "-y" if overwrite_existing_files else "-n",
+        "-ss",
+        start_time,
+        "-i",
+        final_path,
+    ]
+    if end_seconds != float("inf"):
+        command += ["-t", _format_duration(end_seconds - start_seconds)]
+    command += ["-c", "copy", output_path]
+
+    result = subprocess.run(command)
+    if result.returncode != 0:
+        log_message(f"Post-trim failed with exit code {result.returncode}.")
+        return False
+
+    if not os.path.isfile(output_path) or os.path.getsize(output_path) <= 0:
+        log_message(f"Post-trim failed. Output missing or empty: {output_path}")
+        return False
+
+    if delete_original_after_trim:
+        try:
+            os.remove(final_path)
+        except OSError as error:
+            log_exception(
+                f"Failed to delete original after post-trim: {final_path}",
+                error,
+            )
+
+    return True
+
 
 def _build_ydl_opts(cookie_file_path: str = ""):
     ydl_opts = {
