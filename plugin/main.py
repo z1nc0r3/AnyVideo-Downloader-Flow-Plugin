@@ -326,8 +326,8 @@ def _build_format_choices(format_id: str, is_audio: bool):
     requested = str(format_id or "").strip()
     choices = []
     if requested:
-        choices.append(f"{requested}+bestaudio")
         choices.append(requested)
+        choices.append(f"{requested}+bestaudio")
     choices.append("bestvideo+bestaudio")
     choices.append("best")
 
@@ -469,6 +469,10 @@ def fetch_settings() -> PluginSettings:
         overwrite_existing_files = as_bool(
             user_settings.get("overwrite_existing_files", True), True
         )
+        trim_mode = _normalize_trim_mode(user_settings.get("trim_mode"))
+        delete_original_after_trim = as_bool(
+            user_settings.get("delete_original_after_trim", False), False
+        )
         cookie_file_path, cookie_file_error = _resolve_cookie_file_settings(
             user_settings
         )
@@ -479,6 +483,8 @@ def fetch_settings() -> PluginSettings:
         pref_audio_format = "mp3"
         auto_open_folder = False
         overwrite_existing_files = True
+        trim_mode = TRIM_MODE_OFF
+        delete_original_after_trim = False
         cookie_file_path = ""
         cookie_file_error = ""
 
@@ -489,6 +495,8 @@ def fetch_settings() -> PluginSettings:
         preferred_audio_format=pref_audio_format,
         auto_open_folder=auto_open_folder,
         overwrite_existing_files=overwrite_existing_files,
+        trim_mode=trim_mode,
+        delete_original_after_trim=delete_original_after_trim,
         cookie_file_path=cookie_file_path,
         cookie_file_error=cookie_file_error,
     )
@@ -551,10 +559,18 @@ def query(query: str) -> ResultResponse:
     if not query.strip():
         return send_results([init_results(plugin_settings.download_path)])
 
-    if not is_valid_url(query):
+    query_request = _parse_query_request(query)
+    url = query_request.url
+    download_section = query_request.download_section
+    trim_mode = plugin_settings.trim_mode
+
+    if download_section and trim_mode == TRIM_MODE_OFF:
+        return send_results([trim_disabled_result()])
+
+    if not is_valid_url(url):
         return send_results([invalid_result()])
 
-    if not has_extractable_url_target(query):
+    if not has_extractable_url_target(url):
         return send_results([invalid_result()])
 
     if plugin_settings.cookie_file_error:
@@ -564,13 +580,13 @@ def query(query: str) -> ResultResponse:
 
     active_cookie_file_path = plugin_settings.cookie_file_path
     ydl = CustomYoutubeDL(params=_build_ydl_opts(active_cookie_file_path))
-    info = ydl.extract_info(query, download=False)
+    info = ydl.extract_info(url, download=False)
 
     if info is None:
         if active_cookie_file_path:
             active_cookie_file_path = ""
             ydl = CustomYoutubeDL(params=_build_ydl_opts())
-            info = ydl.extract_info(query, download=False)
+            info = ydl.extract_info(url, download=False)
 
     if info is None:
         if ydl.error_message:
@@ -581,7 +597,7 @@ def query(query: str) -> ResultResponse:
 
     if active_cookie_file_path and not formats and _get_raw_formats(info or {}):
         fallback_ydl = CustomYoutubeDL(params=_build_ydl_opts())
-        fallback_info = fallback_ydl.extract_info(query, download=False)
+        fallback_info = fallback_ydl.extract_info(url, download=False)
         fallback_formats = _build_formats(fallback_info or {})
         if fallback_info is not None and fallback_formats:
             ydl = fallback_ydl
@@ -637,7 +653,7 @@ def query(query: str) -> ResultResponse:
             )
             results.append(
                 best_video_result(
-                    query,
+                    url,
                     thumbnail,
                     best_video,
                     plugin_settings.download_path,
