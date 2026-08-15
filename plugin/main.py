@@ -113,6 +113,28 @@ def _build_ydl_opts(cookie_file_path: str = ""):
     return ydl_opts
 
 
+def _build_format_choices(format_id: str, is_audio: bool):
+    if is_audio:
+        return ["bestaudio/best"]
+
+    requested = str(format_id or "").strip()
+    choices = []
+    if requested:
+        choices.append(f"{requested}+bestaudio")
+        choices.append(requested)
+    choices.append("bestvideo+bestaudio")
+    choices.append("best")
+
+    deduped = []
+    seen = set()
+    for choice in choices:
+        if choice in seen:
+            continue
+        seen.add(choice)
+        deduped.append(choice)
+    return deduped
+
+
 def _format_resolution(format_info):
     resolution = format_info.get("resolution")
     if resolution and resolution != "unknown":
@@ -481,23 +503,8 @@ def download(
 
     exe_path = os.path.join(os.path.dirname(__file__), "yt-dlp.exe")
     ffmpeg_path = get_binaries_paths() or ""
+    format_choices = _build_format_choices(format_id, is_audio)
 
-    if is_audio:
-        format_value = "bestaudio/best"
-    else:
-        # If the user selected a specific format_id (e.g. "137"), try:
-        # 1) <format_id>+bestaudio (video+audio merged)
-        # 2) <format_id> (video only) — yt-dlp can later combine with audio if available
-        # 3) bestvideo+bestaudio (best muxed)
-        # 4) best (fallback)
-        requested = str(format_id) if format_id else ""
-        fallback_choices = []
-        if requested:
-            fallback_choices.append(f"{requested}+bestaudio")
-            fallback_choices.append(f"{requested}")
-        fallback_choices.append("bestvideo+bestaudio")
-        fallback_choices.append("best")
-        format_value = "/".join(fallback_choices)
 
     command = [exe_path, url, "-f", format_value]
 
