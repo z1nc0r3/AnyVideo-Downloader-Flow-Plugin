@@ -573,11 +573,11 @@ def download(
 
     try:
         result = None
-        attempted_commands = []
+        attempted_formats = []
         for index, format_choice in enumerate(format_choices, start=1):
             attempt_command = command[:2] + ["-f", format_choice] + command[2:]
-            attempted_commands.append(attempt_command)
-        result = subprocess.run(command)
+            attempted_formats.append(format_choice)
+
 
             if is_timed_download:
                 log_message(
@@ -590,16 +590,10 @@ def download(
             if result.returncode == 0:
                 break
 
-            log_message(
-                "Download attempt failed with exit code "
-                f"{result.returncode}: {_quote_command(attempt_command)}"
-            )
-
         if result.returncode != 0:
             log_message(
                 "All download attempts failed. Last exit code "
-                f"{result.returncode}. Attempts: "
-                f"{' | '.join(_quote_command(item) for item in attempted_commands)}"
+                f"{result.returncode}. Formats tried: {', '.join(attempted_formats)}"
             )
         if result.returncode == 0 and auto_open_folder and os.path.isdir(download_path):
             os.startfile(download_path)
