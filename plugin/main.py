@@ -91,6 +91,18 @@ class PluginSettings:
     cookie_file_error: str = ""
 
 
+@dataclass(frozen=True)
+class QueryRequest:
+    url: str
+    download_section: str = ""
+    start_time: str = ""
+    end_time: str = ""
+
+    @property
+    def has_time_range(self) -> bool:
+        return bool(self.download_section)
+
+
 def _normalize_download_path(download_path: str) -> str:
     expanded = normalize_path(download_path)
     return expanded if os.path.exists(expanded) else DEFAULT_DOWNLOAD_PATH
@@ -112,6 +124,118 @@ def _resolve_cookie_file_settings(user_settings) -> Tuple[str, str]:
 
 def _node_js_runtime_available() -> bool:
     return shutil.which("node") is not None
+
+
+def _normalize_trim_mode(mode: str) -> str:
+    mode = str(mode or "").strip()
+    return mode if mode in TRIM_MODES else TRIM_MODE_OFF
+
+
+def _timestamp_seconds(token: str, allow_inf: bool = False):
+    token = str(token or "").strip().lower()
+    if token == "inf":
+        return float("inf") if allow_inf else None
+
+    if not token:
+        return None
+
+    parts = token.split(":")
+    if len(parts) > 3:
+        return None
+
+    try:
+        if len(parts) == 1:
+            seconds = float(parts[0])
+        else:
+            if any(part == "" for part in parts):
+                return None
+            whole_parts = parts[:-1]
+            if not all(part.isdigit() for part in whole_parts):
+                return None
+            seconds_part = float(parts[-1])
+            if seconds_part >= 60:
+                return None
+            if len(parts) == 2:
+                minutes = int(parts[0])
+                seconds = minutes * 60 + seconds_part
+            else:
+                hours = int(parts[0])
+                minutes = int(parts[1])
+                if minutes >= 60:
+                    return None
+                seconds = hours * 3600 + minutes * 60 + seconds_part
+    except ValueError:
+        return None
+
+    if seconds < 0:
+        return None
+    return seconds
+
+
+def _build_download_section(start_time: str, end_time: str) -> str:
+    start_time = str(start_time or "").strip().lower()
+    end_time = str(end_time or "").strip().lower()
+
+    start_seconds = _timestamp_seconds(start_time)
+    end_seconds = _timestamp_seconds(end_time, allow_inf=True)
+    if start_seconds is None or end_seconds is None:
+        return ""
+    if end_seconds != float("inf") and end_seconds <= start_seconds:
+        return ""
+
+    return f"*{start_time}-{end_time}"
+
+
+def _parse_query_request(query: str) -> QueryRequest:
+    parts = str(query or "").strip().split()
+    if len(parts) < 3:
+        return QueryRequest(str(query or "").strip())
+
+    section = _build_download_section(parts[-2], parts[-1])
+    if not section:
+        return QueryRequest(str(query or "").strip())
+
+    return QueryRequest(" ".join(parts[:-2]), section, parts[-2].lower(), parts[-1].lower())
+
+
+def _quote_command(command):
+    return " ".join(shlex.quote(str(arg)) for arg in command)
+
+
+def _create_trim_marker_path() -> str:
+    os.makedirs(PLUGIN_CACHE_DIR, exist_ok=True)
+    return os.path.join(PLUGIN_CACHE_DIR, f"trim-final-path-{uuid.uuid4().hex}.txt")
+
+
+def _delete_file_if_exists(path: str) -> None:
+    if not path:
+        return
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        log_exception(f"Failed to delete file: {path}", error)
+
+
+def _read_final_path_marker(marker_path: str) -> str:
+    try:
+        lines = Path(marker_path).read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+
+    for line in reversed(lines):
+        final_path = line.strip().strip('"')
+        if final_path:
+            return final_path
+    return ""
+
+
+def _format_duration(seconds: float) -> str:
+    if seconds == int(seconds):
+        return str(int(seconds))
+    return str(round(seconds, 3))
+
 
 
 def _build_ydl_opts(cookie_file_path: str = ""):
