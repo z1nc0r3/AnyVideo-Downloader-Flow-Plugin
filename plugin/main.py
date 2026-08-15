@@ -327,8 +327,8 @@ def _build_format_choices(format_id: str, is_audio: bool):
     requested = str(format_id or "").strip()
     choices = []
     if requested:
-        choices.append(requested)
         choices.append(f"{requested}+bestaudio")
+        choices.append(requested)
     choices.append("bestvideo+bestaudio")
     choices.append("best")
 

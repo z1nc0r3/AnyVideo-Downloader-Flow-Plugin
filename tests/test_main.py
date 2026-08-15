@@ -84,10 +84,10 @@ class TestTrimModeSettings:
 
 
 class TestFormatChoices:
-    def test_video_format_choices_keep_requested_format_first(self):
+    def test_video_format_choices_try_merging_audio_first(self):
         assert main._build_format_choices("137", False) == [
-            "137",
             "137+bestaudio",
+            "137",
             "bestvideo+bestaudio",
             "best",
         ]
@@ -286,7 +286,7 @@ class TestDownloadCommand:
         )
 
         command = captured["command"]
-        assert command[command.index("-f") + 1] == "18"
+        assert command[command.index("-f") + 1] == "18+bestaudio"
         assert "--retries" in command
         assert command[command.index("--retries") + 1] == "10"
         assert "--fragment-retries" in command
@@ -331,8 +331,8 @@ class TestDownloadCommand:
         )
 
         assert len(commands) == 2
-        assert commands[0][commands[0].index("-f") + 1] == "18"
-        assert commands[1][commands[1].index("-f") + 1] == "18+bestaudio"
+        assert commands[0][commands[0].index("-f") + 1] == "18+bestaudio"
+        assert commands[1][commands[1].index("-f") + 1] == "18"
 
     def test_download_logs_concise_summary_when_all_format_choices_fail(
         self, monkeypatch, tmp_path
@@ -366,7 +366,7 @@ class TestDownloadCommand:
         assert messages == [
             (
                 "All download attempts failed. Last exit code 1. "
-                "Formats tried: 18, 18+bestaudio, bestvideo+bestaudio, best"
+                "Formats tried: 18+bestaudio, 18, bestvideo+bestaudio, best"
             )
         ]
 
