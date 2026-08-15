@@ -506,7 +506,7 @@ def download(
     format_choices = _build_format_choices(format_id, is_audio)
 
 
-    command = [exe_path, url, "-f", format_value]
+    command = [exe_path, url]
 
     if is_audio:
         command += [
@@ -572,7 +572,35 @@ def download(
     command = [arg for arg in command if arg is not None and arg != ""]
 
     try:
+        result = None
+        attempted_commands = []
+        for index, format_choice in enumerate(format_choices, start=1):
+            attempt_command = command[:2] + ["-f", format_choice] + command[2:]
+            attempted_commands.append(attempt_command)
         result = subprocess.run(command)
+
+            if is_timed_download:
+                log_message(
+                    f"Starting timed download ({timed_download_mode}) "
+                    f"attempt {index}/{len(format_choices)}: "
+                    f"{_quote_command(attempt_command)}"
+                )
+
+            result = subprocess.run(attempt_command)
+            if result.returncode == 0:
+                break
+
+            log_message(
+                "Download attempt failed with exit code "
+                f"{result.returncode}: {_quote_command(attempt_command)}"
+            )
+
+        if result.returncode != 0:
+            log_message(
+                "All download attempts failed. Last exit code "
+                f"{result.returncode}. Attempts: "
+                f"{' | '.join(_quote_command(item) for item in attempted_commands)}"
+            )
         if result.returncode == 0 and auto_open_folder and os.path.isdir(download_path):
             os.startfile(download_path)
     except Exception as e:
