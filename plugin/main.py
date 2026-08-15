@@ -59,6 +59,20 @@ PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
 CHECK_INTERVAL_DAYS = 7
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 MAX_FORMAT_RESULTS = 40
+TRIM_MODE_OFF = "Off"
+TRIM_MODE_NATIVE_SECTION = "Native section download"
+TRIM_MODE_DOWNLOAD_THEN_TRIM = "Download then trim"
+TRIM_MODES = (
+    TRIM_MODE_OFF,
+    TRIM_MODE_DOWNLOAD_THEN_TRIM,
+    TRIM_MODE_NATIVE_SECTION,
+)
+TRIM_MODE_ALIASES = {
+    "native": TRIM_MODE_NATIVE_SECTION,
+    "native_section": TRIM_MODE_NATIVE_SECTION,
+    "download_section": TRIM_MODE_NATIVE_SECTION,
+    "post_trim": TRIM_MODE_DOWNLOAD_THEN_TRIM,
+}
 
 plugin = Plugin()
 
@@ -71,6 +85,8 @@ class PluginSettings:
     preferred_audio_format: str
     auto_open_folder: bool
     overwrite_existing_files: bool
+    timed_download_mode: str = TRIM_MODE_OFF
+    delete_original_after_trim: bool = False
     cookie_file_path: str = ""
     cookie_file_error: str = ""
 
