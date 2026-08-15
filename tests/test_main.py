@@ -84,12 +84,10 @@ class TestTrimModeSettings:
 
 
 class TestFormatChoices:
-    def test_video_format_choices_try_merging_audio_first(self):
-        assert main._build_format_choices("137", False) == [
+    def test_video_format_choices_keep_requested_selector_first(self):
+        assert main._build_format_choices("137+bestaudio", False) == [
             "137+bestaudio",
-            "137",
-            "bestvideo+bestaudio",
-            "best",
+            "bestvideo+bestaudio/best",
         ]
 
     def test_audio_format_choices_use_audio_fallback(self):
@@ -97,8 +95,7 @@ class TestFormatChoices:
 
     def test_empty_video_format_choices_fall_back_to_best_video(self):
         assert main._build_format_choices("", False) == [
-            "bestvideo+bestaudio",
-            "best",
+            "bestvideo+bestaudio/best",
         ]
 
 
@@ -286,18 +283,17 @@ class TestDownloadCommand:
         )
 
         command = captured["command"]
-        assert command[command.index("-f") + 1] == "18+bestaudio"
+        assert command[command.index("-f") + 1] == "18"
         assert "--retries" in command
         assert command[command.index("--retries") + 1] == "10"
         assert "--fragment-retries" in command
         assert command[command.index("--fragment-retries") + 1] == "10"
         assert "--file-access-retries" in command
         assert "--extractor-retries" in command
-        assert "--http-chunk-size" in command
-        assert command[command.index("--http-chunk-size") + 1] == "10M"
+        assert "--http-chunk-size" not in command
         assert "--no-part" not in command
 
-    def test_download_retries_next_format_choice_after_failure(
+    def test_download_falls_back_to_best_video_after_selected_format_failure(
         self, monkeypatch, tmp_path
     ):
         commands = []
@@ -305,12 +301,9 @@ class TestDownloadCommand:
         class FailedProcess:
             returncode = 1
 
-        class CompletedProcess:
-            returncode = 0
-
         def fake_run(command):
             commands.append(command)
-            return FailedProcess() if len(commands) == 1 else CompletedProcess()
+            return FailedProcess()
 
         monkeypatch.setattr(main, "check_ytdlp_version", lambda interval: False)
         monkeypatch.setattr(main, "get_binaries_paths", lambda: "")
@@ -331,8 +324,8 @@ class TestDownloadCommand:
         )
 
         assert len(commands) == 2
-        assert commands[0][commands[0].index("-f") + 1] == "18+bestaudio"
-        assert commands[1][commands[1].index("-f") + 1] == "18"
+        assert commands[0][commands[0].index("-f") + 1] == "18"
+        assert commands[1][commands[1].index("-f") + 1] == "bestvideo+bestaudio/best"
 
     def test_download_logs_concise_summary_when_all_format_choices_fail(
         self, monkeypatch, tmp_path
@@ -364,9 +357,10 @@ class TestDownloadCommand:
         )
 
         assert messages == [
+            "Selected format failed with exit code 1; retrying best available video.",
             (
                 "All download attempts failed. Last exit code 1. "
-                "Formats tried: 18+bestaudio, 18, bestvideo+bestaudio, best"
+                "Formats tried: 18, bestvideo+bestaudio/best"
             )
         ]
 

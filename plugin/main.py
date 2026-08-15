@@ -325,12 +325,11 @@ def _build_format_choices(format_id: str, is_audio: bool):
         return ["bestaudio/best"]
 
     requested = str(format_id or "").strip()
-    choices = []
+    fallback = "bestvideo+bestaudio/best"
     if requested:
-        choices.append(f"{requested}+bestaudio")
-        choices.append(requested)
-    choices.append("bestvideo+bestaudio")
-    choices.append("best")
+        choices = [requested, fallback]
+    else:
+        choices = [fallback]
 
     deduped = []
     seen = set()
@@ -773,8 +772,6 @@ def download(
         "http:exp=1:20",
         "--retry-sleep",
         "fragment:exp=1:20",
-        "--http-chunk-size",
-        "10M",
     ]
 
     if overwrite_existing_files:
@@ -823,7 +820,7 @@ def download(
     try:
         result = None
         attempted_formats = []
-        for format_choice in format_choices:
+        for index, format_choice in enumerate(format_choices):
             attempt_command = command[:2] + ["-f", format_choice] + command[2:]
             attempted_formats.append(format_choice)
 
@@ -833,6 +830,11 @@ def download(
             result = subprocess.run(attempt_command)
             if result.returncode == 0:
                 break
+            if index + 1 < len(format_choices):
+                log_message(
+                    "Selected format failed with exit code "
+                    f"{result.returncode}; retrying best available video."
+                )
 
         if result.returncode != 0:
             log_message(
