@@ -36,6 +36,7 @@ from utils import (
     launch_plugin_setup,
 )
 from results import (
+    DownloadContext,
     init_results,
     invalid_result,
     error_result,
@@ -564,14 +565,14 @@ def query(query: str) -> ResultResponse:
     download_section = query_request.download_section
     trim_mode = plugin_settings.trim_mode
 
-    if download_section and trim_mode == TRIM_MODE_OFF:
-        return send_results([trim_disabled_result()])
-
     if not is_valid_url(url):
         return send_results([invalid_result()])
 
     if not has_extractable_url_target(url):
         return send_results([invalid_result()])
+
+    if download_section and trim_mode == TRIM_MODE_OFF:
+        return send_results([trim_disabled_result()])
 
     if plugin_settings.cookie_file_error:
         return send_results(
@@ -635,6 +636,20 @@ def query(query: str) -> ResultResponse:
     thumbnail = str(info.get("thumbnail") or "")
     full_title = str(info.get("title") or "Unknown Title")
     title = full_title[:50] + "..." if len(full_title) > 50 else full_title
+    download_context = DownloadContext(
+        url=url,
+        download_path=plugin_settings.download_path,
+        pref_video_path=plugin_settings.preferred_video_format,
+        pref_audio_path=plugin_settings.preferred_audio_format,
+        auto_open_folder=plugin_settings.auto_open_folder,
+        overwrite_existing_files=plugin_settings.overwrite_existing_files,
+        cookie_file_path=active_cookie_file_path,
+        download_section=download_section,
+        trim_start_time=query_request.start_time,
+        trim_end_time=query_request.end_time,
+        trim_mode=trim_mode,
+        delete_original_after_trim=plugin_settings.delete_original_after_trim,
+    )
 
     # Find best video (highest resolution, then highest bitrate)
     video_formats = [
@@ -653,20 +668,9 @@ def query(query: str) -> ResultResponse:
             )
             results.append(
                 best_video_result(
-                    url,
+                    download_context,
                     thumbnail,
                     best_video,
-                    plugin_settings.download_path,
-                    plugin_settings.preferred_video_format,
-                    plugin_settings.preferred_audio_format,
-                    plugin_settings.auto_open_folder,
-                    plugin_settings.overwrite_existing_files,
-                    active_cookie_file_path,
-                    download_section,
-                    query_request.start_time,
-                    query_request.end_time,
-                    trim_mode,
-                    plugin_settings.delete_original_after_trim,
                 )
             )
         except (ValueError, TypeError) as e:
@@ -679,20 +683,9 @@ def query(query: str) -> ResultResponse:
             best_audio = max(audio_formats, key=lambda x: numeric_value(x.get("tbr")))
             results.append(
                 best_audio_result(
-                    url,
+                    download_context,
                     thumbnail,
                     best_audio,
-                    plugin_settings.download_path,
-                    plugin_settings.preferred_video_format,
-                    plugin_settings.preferred_audio_format,
-                    plugin_settings.auto_open_folder,
-                    plugin_settings.overwrite_existing_files,
-                    active_cookie_file_path,
-                    download_section,
-                    query_request.start_time,
-                    query_request.end_time,
-                    trim_mode,
-                    plugin_settings.delete_original_after_trim,
                 )
             )
         except (ValueError, TypeError) as e:
@@ -701,21 +694,10 @@ def query(query: str) -> ResultResponse:
     results.extend(
         [
             query_result(
-                url,
+                download_context,
                 thumbnail,
                 title,
                 format,
-                plugin_settings.download_path,
-                plugin_settings.preferred_video_format,
-                plugin_settings.preferred_audio_format,
-                plugin_settings.auto_open_folder,
-                plugin_settings.overwrite_existing_files,
-                active_cookie_file_path,
-                download_section,
-                query_request.start_time,
-                query_request.end_time,
-                trim_mode,
-                plugin_settings.delete_original_after_trim,
             )
             for format in formats
         ]
