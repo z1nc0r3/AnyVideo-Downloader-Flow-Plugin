@@ -1,4 +1,4 @@
-# AnyVideo Downloader v2.5.2 - [2026-July-30]  🔻
+# AnyVideo Downloader v2.6.0 - [2026-August-15]  🔻
 
 
 ![](https://github.com/user-attachments/assets/18a6cff4-ee86-4322-a72d-c6a02628503a)
@@ -12,6 +12,12 @@
 ![JDpcNosMet](https://github.com/user-attachments/assets/5049273d-72f9-4d7b-86cb-1a924b0f5b21)
 
 
+## What's New ✨
+- Added video trimming support. Add start and end times after a URL to download only the part you need.
+- Trimming is optional and disabled by default. You can enable `Download then trim` or `Native section download` from plugin settings.
+- Download reliability was improved by retrying the selected video format with yt-dlp's best available video fallback when needed.
+
+
 ## Features 🪄
 - Supports 1000+ websites
 - Download videos in various formats
@@ -23,6 +29,7 @@
   - Sort by **File size** _(NB: The file size won't be available for some videos)_
   - Sort by **Total bitrate**
   - Sort by **FPS** _(NB: The FPS won't be available for some videos)_
+- Optional partial downloads with start and end times
 - Cookies support for websites that require login
 
 
@@ -33,6 +40,13 @@
 - Insert the URL of the video you want to download
 - Select the video format you need
 - It'll open a separate terminal which continues the download
+- To download only part of a video, add start and end times after the URL:
+  ```text
+  vd <url> 1:00 2:30
+  ```
+  Video trimming is disabled by default. Enable a trim mode in plugin settings first:
+  - `Download then trim`: downloads normally, trims the finished file with ffmpeg, and optionally deletes the original after a successful trim.
+  - `Native section download`: uses yt-dlp's `--download-sections` support. yt-dlp delegates ranged downloads to ffmpeg, so this can be slower or show less progress output than normal downloads on some websites.
 
 
 ## Contribution 🤝
