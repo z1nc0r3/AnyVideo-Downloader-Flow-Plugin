@@ -46,6 +46,18 @@ def _trim_subtitle(download_section):
     return f"Trim: {str(download_section).lstrip('*')}"
 
 
+def _format_selector(format_info, is_audio):
+    format_id = f"{format_info['format_id']}"
+    if is_audio or "+" in format_id:
+        return format_id
+
+    acodec = str(format_info.get("acodec") or "").lower()
+    if acodec in ("", "none"):
+        return f"{format_id}+bestaudio"
+
+    return format_id
+
+
 def _download_parameters(
     context,
     format_info,
@@ -53,7 +65,7 @@ def _download_parameters(
 ):
     return [
         context.url,
-        f"{format_info['format_id']}",
+        _format_selector(format_info, is_audio),
         context.download_path,
         context.pref_video_path,
         context.pref_audio_path,

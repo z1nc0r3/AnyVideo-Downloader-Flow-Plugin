@@ -115,7 +115,12 @@ class TestYtdlpUpdateInProgressResult:
 
 class TestBestVideoResult:
     def _make_format(self, resolution="1920x1080", format_id="137"):
-        return {"resolution": resolution, "format_id": format_id}
+        return {
+            "resolution": resolution,
+            "format_id": format_id,
+            "vcodec": "avc1",
+            "acodec": "none",
+        }
 
     def test_with_resolution(self):
         fmt = self._make_format()
@@ -138,7 +143,7 @@ class TestBestVideoResult:
         params = _params(r)
         assert r.json_rpc_action["Method"] == "download"
         assert params[0] == "http://example.com"
-        assert params[1] == "137"
+        assert params[1] == "137+bestaudio"
         assert params[2] == "/downloads"
         assert params[3] == "mp4"
         assert params[4] == "mp3"
@@ -156,6 +161,20 @@ class TestBestVideoResult:
         fmt = self._make_format()
         r = best_video_result(_context(), "thumb.jpg", fmt)
         assert r.icon == "thumb.jpg"
+
+    def test_combined_video_format_uses_raw_format_id(self):
+        fmt = self._make_format()
+        fmt["acodec"] = "mp4a"
+        r = best_video_result(_context(), None, fmt)
+
+        assert _params(r)[1] == "137"
+
+    def test_video_format_with_unknown_audio_codec_adds_best_audio(self):
+        fmt = self._make_format()
+        fmt.pop("acodec")
+        r = best_video_result(_context(), None, fmt)
+
+        assert _params(r)[1] == "137+bestaudio"
 
 
 class TestBestAudioResult:
@@ -214,6 +233,8 @@ class TestQueryResult:
             "tbr": 4000.5,
             "filesize": 104857600,
             "fps": 30,
+            "vcodec": "avc1",
+            "acodec": "none",
         }
         base.update(overrides)
         return base
@@ -237,6 +258,8 @@ class TestQueryResult:
 
     def test_audio_only_detection(self):
         fmt = self._make_format(resolution="audio only")
+        fmt["vcodec"] = "none"
+        fmt["acodec"] = "mp4a"
         r = query_result(
             _context(cookie_file_path="/cookies.txt"),
             None,
@@ -251,6 +274,7 @@ class TestQueryResult:
         fmt = self._make_format()
         r = query_result(_context(), None, "Test Video", fmt)
         assert _params(r)[5] is False
+        assert _params(r)[1] == "137+bestaudio"
 
     def test_title_pass_through(self):
         fmt = self._make_format()
