@@ -68,8 +68,103 @@ class TestYdlOptions:
 
         assert ydl_opts["js_runtimes"] == {"node": {}}
 
+class TestFormatChoices:
+    def test_video_format_choices_keep_requested_format_first(self):
+        assert main._build_format_choices("137", False) == [
+            "137",
+            "137+bestaudio",
+            "bestvideo+bestaudio",
+            "best",
+        ]
+
+    def test_audio_format_choices_use_audio_fallback(self):
+        assert main._build_format_choices("140", True) == ["bestaudio/best"]
+
+    def test_empty_video_format_choices_fall_back_to_best_video(self):
+        assert main._build_format_choices("", False) == [
+            "bestvideo+bestaudio",
+            "best",
+        ]
+
 
 class TestDownloadCommand:
+    def test_download_adds_resilient_http_retry_arguments(self, monkeypatch, tmp_path):
+        captured = {}
+
+        class CompletedProcess:
+            returncode = 0
+
+        def fake_run(command):
+            captured["command"] = command
+            return CompletedProcess()
+
+        monkeypatch.setattr(main, "check_ytdlp_version", lambda interval: False)
+        monkeypatch.setattr(main, "get_binaries_paths", lambda: "")
+        monkeypatch.setattr(main, "_node_js_runtime_available", lambda: False)
+        monkeypatch.setattr(main.subprocess, "run", fake_run)
+        monkeypatch.setattr(main, "log_message", lambda message: None)
+
+        main.download(
+            "https://example.com/video",
+            "18",
+            str(tmp_path),
+            "mp4",
+            "mp3",
+            False,
+            False,
+            True,
+            "",
+        )
+
+        command = captured["command"]
+        assert command[command.index("-f") + 1] == "18"
+        assert "--retries" in command
+        assert command[command.index("--retries") + 1] == "10"
+        assert "--fragment-retries" in command
+        assert command[command.index("--fragment-retries") + 1] == "10"
+        assert "--file-access-retries" in command
+        assert "--extractor-retries" in command
+        assert "--http-chunk-size" in command
+        assert command[command.index("--http-chunk-size") + 1] == "10M"
+        assert "--no-part" not in command
+
+    def test_download_retries_next_format_choice_after_failure(
+        self, monkeypatch, tmp_path
+    ):
+        commands = []
+
+        class FailedProcess:
+            returncode = 1
+
+        class CompletedProcess:
+            returncode = 0
+
+        def fake_run(command):
+            commands.append(command)
+            return FailedProcess() if len(commands) == 1 else CompletedProcess()
+
+        monkeypatch.setattr(main, "check_ytdlp_version", lambda interval: False)
+        monkeypatch.setattr(main, "get_binaries_paths", lambda: "")
+        monkeypatch.setattr(main, "_node_js_runtime_available", lambda: False)
+        monkeypatch.setattr(main.subprocess, "run", fake_run)
+        monkeypatch.setattr(main, "log_message", lambda message: None)
+
+        main.download(
+            "https://example.com/video",
+            "18",
+            str(tmp_path),
+            "mp4",
+            "mp3",
+            False,
+            False,
+            True,
+            "",
+        )
+
+        assert len(commands) == 2
+        assert commands[0][commands[0].index("-f") + 1] == "18"
+        assert commands[1][commands[1].index("-f") + 1] == "18+bestaudio"
+
     def test_download_adds_cookie_file_argument(self, monkeypatch, tmp_path):
         cookie_file = tmp_path / "cookies.txt"
         cookie_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
