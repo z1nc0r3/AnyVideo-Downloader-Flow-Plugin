@@ -578,13 +578,8 @@ def download(
             attempt_command = command[:2] + ["-f", format_choice] + command[2:]
             attempted_formats.append(format_choice)
 
-
-            if is_timed_download:
-                log_message(
-                    f"Starting timed download ({timed_download_mode}) "
-                    f"attempt {index}/{len(format_choices)}: "
-                    f"{_quote_command(attempt_command)}"
-                )
+            if marker_path:
+                _delete_file_if_exists(marker_path)
 
             result = subprocess.run(attempt_command)
             if result.returncode == 0:
