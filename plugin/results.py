@@ -40,10 +40,16 @@ def _open_settings_action():
     }
 
 
-def _trim_subtitle(download_section):
-    if not download_section:
+def _trim_subtitle(context):
+    if not context.download_section:
         return None
-    return f"Trim: {str(download_section).lstrip('*')}"
+
+    start_time = str(context.trim_start_time or "").strip()
+    end_time = str(context.trim_end_time or "").strip()
+    if start_time and end_time:
+        return f"Trim: {start_time} to {end_time}"
+
+    return f"Trim: {str(context.download_section).lstrip('*')}"
 
 
 def _format_selector(format_info, is_audio):
@@ -161,7 +167,7 @@ def best_video_result(context, thumbnail, format_info) -> Result:
 
     return Result(
         title=result_title,
-        subtitle=_trim_subtitle(context.download_section),
+        subtitle=_trim_subtitle(context),
         icon=thumbnail or APP_ICON,
         json_rpc_action=_download_action(
             _download_parameters(
@@ -180,7 +186,7 @@ def best_audio_result(context, thumbnail, format_info) -> Result:
 
     return Result(
         title=result_title,
-        subtitle=_trim_subtitle(context.download_section),
+        subtitle=_trim_subtitle(context),
         icon=thumbnail or APP_ICON,
         json_rpc_action=_download_action(
             _download_parameters(
@@ -206,7 +212,7 @@ def query_result(context, thumbnail, title, format_info) -> Result:
         subtitle_parts.append(f"FPS: {int(format_info['fps'])}")
 
     if context.download_section:
-        subtitle_parts.append(_trim_subtitle(context.download_section))
+        subtitle_parts.append(_trim_subtitle(context))
 
     return Result(
         title=title,
