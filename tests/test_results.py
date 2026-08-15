@@ -222,7 +222,7 @@ class TestBestAudioResult:
         assert _params(r)[11] == "00:30"
         assert _params(r)[12] == "Download then trim"
         assert _params(r)[13] is True
-        assert r.subtitle == "Trim: 00:01-00:30"
+        assert r.subtitle == "Trim: 00:01 to 00:30"
 
 
 class TestQueryResult:
@@ -299,9 +299,27 @@ class TestQueryResult:
     def test_download_section_added_to_subtitle(self):
         fmt = self._make_format()
         r = query_result(
-            _context(download_section="*00:01-00:30"),
+            _context(
+                download_section="*01:00-02:04",
+                trim_start_time="01:00",
+                trim_end_time="02:04",
+            ),
             None,
             "Test",
             fmt,
         )
-        assert "Trim: 00:01-00:30" in r.subtitle
+        assert "Trim: 01:00 to 02:04" in r.subtitle
+
+    def test_open_ended_download_section_added_to_subtitle(self):
+        fmt = self._make_format()
+        r = query_result(
+            _context(
+                download_section="*00:30-inf",
+                trim_start_time="00:30",
+                trim_end_time="inf",
+            ),
+            None,
+            "Test",
+            fmt,
+        )
+        assert "Trim: 00:30 to inf" in r.subtitle

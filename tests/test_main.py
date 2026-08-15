@@ -82,6 +82,17 @@ class TestTrimModeSettings:
         )
         assert main._normalize_trim_mode("unknown") == main.TRIM_MODE_OFF
 
+    def test_fetch_settings_accepts_legacy_timed_download_mode_key(self, monkeypatch):
+        class FakePlugin:
+            settings = {"timed_download_mode": "Download then trim"}
+
+        monkeypatch.setattr(main, "plugin", FakePlugin())
+        monkeypatch.setattr(main, "_normalize_download_path", lambda path: path)
+
+        settings = main.fetch_settings()
+
+        assert settings.trim_mode == main.TRIM_MODE_DOWNLOAD_THEN_TRIM
+
 
 class TestFormatChoices:
     def test_video_format_choices_keep_requested_selector_first(self):
