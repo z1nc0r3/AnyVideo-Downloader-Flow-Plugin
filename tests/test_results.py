@@ -92,6 +92,8 @@ class TestTrimDisabledResult:
         assert "disabled" in r.title.lower()
         assert "settings" in r.subtitle.lower()
         assert r.icon == "Images/error.png"
+        assert r.json_rpc_action["Method"] == "Flow.Launcher.OpenSettingDialog"
+        assert r.json_rpc_action["Parameters"] == []
 
 
 class TestPluginSetupInProgressResult:

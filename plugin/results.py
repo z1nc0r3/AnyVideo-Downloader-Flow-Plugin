@@ -32,6 +32,14 @@ def _download_action(parameters):
     }
 
 
+def _open_settings_action():
+    return {
+        "Method": "Flow.Launcher.OpenSettingDialog",
+        "Parameters": [],
+        "DontHideAfterAction": False,
+    }
+
+
 def _trim_subtitle(download_section):
     if not download_section:
         return None
@@ -112,8 +120,9 @@ def ffmpeg_setup_result(issue) -> Result:
 def trim_disabled_result() -> Result:
     return Result(
         title="Video trimming is disabled",
-        subtitle="Enable a trim mode in plugin settings to use start/end times.",
+        subtitle="Press Enter to open Flow Launcher settings.",
         icon=ERROR_ICON,
+        json_rpc_action=_open_settings_action(),
     )
 
 
