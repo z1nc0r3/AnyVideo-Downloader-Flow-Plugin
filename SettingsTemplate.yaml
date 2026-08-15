@@ -1,10 +1,21 @@
 body:
+    - type: textBlock
+      attributes:
+          name: download_location_section
+          description: "Download location"
     - type: inputWithFolderBtn
       attributes:
           name: download_path
           label: "Download path:"
           description: "Enter the path where you want to save the downloaded files."
           defaultValue: "%USERPROFILE%\\Downloads"
+    - type: separator
+      attributes:
+          name: format_preferences_separator
+    - type: textBlock
+      attributes:
+          name: format_preferences_section
+          description: "Format preferences"
     - type: dropdown
       attributes:
           name: sorting_order
@@ -42,6 +53,13 @@ body:
               - flac
               - aac
               - opus
+    - type: separator
+      attributes:
+          name: download_behavior_separator
+    - type: textBlock
+      attributes:
+          name: download_behavior_section
+          description: "Download behavior"
     - type: checkbox
       attributes:
           name: auto_open_folder
@@ -54,6 +72,13 @@ body:
           label: "Overwrite existing files"
           defaultValue: true
           description: "Replace existing files with the same output filename."
+    - type: separator
+      attributes:
+          name: cookies_separator
+    - type: textBlock
+      attributes:
+          name: cookies_section
+          description: "Cookies"
     - type: checkbox
       attributes:
           name: use_cookie_file
@@ -66,3 +91,30 @@ body:
           label: "Cookies.txt file path:"
           description: "Optional path to a Netscape-format cookies.txt file."
           defaultValue: ""
+    - type: separator
+      attributes:
+          name: video_trimming_separator
+    - type: textBlock
+      attributes:
+          name: video_trimming_section
+          description: "Video Trimming"
+    - type: dropdown
+      attributes:
+          name: trim_mode
+          label: "Trim mode:"
+          defaultValue: "Off"
+          description: "Choose how start/end times are handled when provided after a URL."
+          options:
+              - Off
+              - Download then trim
+              - Native section download
+    - type: textBlock
+      attributes:
+          name: trim_mode_help
+          description: "Off: Disable URL start/end times.\\r\\nDownload then trim: Download the full file normally, then trim it locally with ffmpeg.\\r\\nNative section download: Ask yt-dlp/ffmpeg to fetch only the requested range; this may be slow on some sites."
+    - type: checkbox
+      attributes:
+          name: delete_original_after_trim
+          label: "Delete original after successful trim"
+          defaultValue: false
+          description: "Only applies to Download then trim mode. The original file is kept if trimming fails."

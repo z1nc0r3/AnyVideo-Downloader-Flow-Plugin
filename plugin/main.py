@@ -6,6 +6,7 @@
 import os
 import shutil
 import subprocess
+import uuid
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,11 +36,13 @@ from utils import (
     launch_plugin_setup,
 )
 from results import (
+    DownloadContext,
     init_results,
     invalid_result,
     error_result,
     empty_result,
     cookie_file_error_result,
+    trim_disabled_result,
     query_result,
     best_video_result,
     best_audio_result,
@@ -56,9 +59,18 @@ except ImportError:
     YTDLP_AVAILABLE = False
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
+PLUGIN_CACHE_DIR = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", ".cache"))
 CHECK_INTERVAL_DAYS = 7
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 MAX_FORMAT_RESULTS = 40
+TRIM_MODE_OFF = "Off"
+TRIM_MODE_NATIVE_SECTION = "Native section download"
+TRIM_MODE_DOWNLOAD_THEN_TRIM = "Download then trim"
+TRIM_MODES = (
+    TRIM_MODE_OFF,
+    TRIM_MODE_DOWNLOAD_THEN_TRIM,
+    TRIM_MODE_NATIVE_SECTION,
+)
 
 plugin = Plugin()
 
@@ -71,8 +83,18 @@ class PluginSettings:
     preferred_audio_format: str
     auto_open_folder: bool
     overwrite_existing_files: bool
+    trim_mode: str = TRIM_MODE_OFF
+    delete_original_after_trim: bool = False
     cookie_file_path: str = ""
     cookie_file_error: str = ""
+
+
+@dataclass(frozen=True)
+class QueryRequest:
+    url: str
+    download_section: str = ""
+    start_time: str = ""
+    end_time: str = ""
 
 
 def _normalize_download_path(download_path: str) -> str:
@@ -98,6 +120,191 @@ def _node_js_runtime_available() -> bool:
     return shutil.which("node") is not None
 
 
+def _normalize_trim_mode(mode: str) -> str:
+    mode = str(mode or "").strip()
+    return mode if mode in TRIM_MODES else TRIM_MODE_OFF
+
+
+def _timestamp_seconds(token: str, allow_inf: bool = False):
+    token = str(token or "").strip().lower()
+    if token == "inf":
+        return float("inf") if allow_inf else None
+
+    if not token:
+        return None
+
+    parts = token.split(":")
+    if len(parts) > 3:
+        return None
+
+    try:
+        if len(parts) == 1:
+            seconds = float(parts[0])
+        else:
+            if any(part == "" for part in parts):
+                return None
+            whole_parts = parts[:-1]
+            if not all(part.isdigit() for part in whole_parts):
+                return None
+            seconds_part = float(parts[-1])
+            if seconds_part >= 60:
+                return None
+            if len(parts) == 2:
+                minutes = int(parts[0])
+                seconds = minutes * 60 + seconds_part
+            else:
+                hours = int(parts[0])
+                minutes = int(parts[1])
+                if minutes >= 60:
+                    return None
+                seconds = hours * 3600 + minutes * 60 + seconds_part
+    except ValueError:
+        return None
+
+    if seconds < 0:
+        return None
+    return seconds
+
+
+def _build_download_section(start_time: str, end_time: str) -> str:
+    start_time = str(start_time or "").strip().lower()
+    end_time = str(end_time or "").strip().lower()
+
+    start_seconds = _timestamp_seconds(start_time)
+    end_seconds = _timestamp_seconds(end_time, allow_inf=True)
+    if start_seconds is None or end_seconds is None:
+        return ""
+    if end_seconds != float("inf") and end_seconds <= start_seconds:
+        return ""
+
+    return f"*{start_time}-{end_time}"
+
+
+def _parse_query_request(query: str) -> QueryRequest:
+    parts = str(query or "").strip().split()
+    if len(parts) < 3:
+        return QueryRequest(str(query or "").strip())
+
+    section = _build_download_section(parts[-2], parts[-1])
+    if not section:
+        return QueryRequest(str(query or "").strip())
+
+    return QueryRequest(" ".join(parts[:-2]), section, parts[-2].lower(), parts[-1].lower())
+
+
+def _create_trim_marker_path() -> str:
+    os.makedirs(PLUGIN_CACHE_DIR, exist_ok=True)
+    return os.path.join(PLUGIN_CACHE_DIR, f"trim-final-path-{uuid.uuid4().hex}.txt")
+
+
+def _delete_file_if_exists(path: str) -> None:
+    if not path:
+        return
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        log_exception(f"Failed to delete file: {path}", error)
+
+
+def _read_final_path_marker(marker_path: str) -> str:
+    try:
+        lines = Path(marker_path).read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+
+    for line in reversed(lines):
+        final_path = line.strip().strip('"')
+        if final_path:
+            return final_path
+    return ""
+
+
+def _format_duration(seconds: float) -> str:
+    if seconds == int(seconds):
+        return str(int(seconds))
+    return str(round(seconds, 3))
+
+
+def _ffmpeg_exe_path(ffmpeg_path: str) -> str:
+    return os.path.join(ffmpeg_path, "ffmpeg.exe") if ffmpeg_path else "ffmpeg"
+
+
+def _trimmed_output_path(source_path: str, overwrite_existing_files: bool) -> str:
+    source = Path(source_path)
+    output = source.with_name(f"{source.stem} - trimmed{source.suffix}")
+    if overwrite_existing_files or not output.exists():
+        return str(output)
+
+    index = 1
+    while True:
+        candidate = source.with_name(f"{source.stem} - trimmed ({index}){source.suffix}")
+        if not candidate.exists():
+            return str(candidate)
+        index += 1
+
+
+def _run_post_trim(
+    final_path: str,
+    start_time: str,
+    end_time: str,
+    ffmpeg_path: str,
+    overwrite_existing_files: bool,
+    delete_original_after_trim: bool,
+) -> bool:
+    final_path = normalize_path(final_path)
+    if not os.path.isfile(final_path):
+        log_message(f"Post-trim skipped. Downloaded file not found: {final_path}")
+        return False
+
+    start_seconds = _timestamp_seconds(start_time)
+    end_seconds = _timestamp_seconds(end_time, allow_inf=True)
+    if start_seconds is None or end_seconds is None:
+        log_message(f"Post-trim skipped. Invalid time range: {start_time}-{end_time}")
+        return False
+    if end_seconds != float("inf") and end_seconds <= start_seconds:
+        log_message(f"Post-trim skipped. Invalid time range: {start_time}-{end_time}")
+        return False
+
+    output_path = _trimmed_output_path(final_path, overwrite_existing_files)
+    if os.path.abspath(final_path) == os.path.abspath(output_path):
+        log_message(f"Post-trim skipped. Output path matches input path: {final_path}")
+        return False
+
+    command = [
+        _ffmpeg_exe_path(ffmpeg_path),
+        "-y" if overwrite_existing_files else "-n",
+        "-ss",
+        start_time,
+        "-i",
+        final_path,
+    ]
+    if end_seconds != float("inf"):
+        command += ["-t", _format_duration(end_seconds - start_seconds)]
+    command += ["-c", "copy", output_path]
+
+    result = subprocess.run(command)
+    if result.returncode != 0:
+        log_message(f"Post-trim failed with exit code {result.returncode}.")
+        return False
+
+    if not os.path.isfile(output_path) or os.path.getsize(output_path) <= 0:
+        log_message(f"Post-trim failed. Output missing or empty: {output_path}")
+        return False
+
+    if delete_original_after_trim:
+        try:
+            os.remove(final_path)
+        except OSError as error:
+            log_exception(
+                f"Failed to delete original after post-trim: {final_path}",
+                error,
+            )
+
+    return True
+
+
 def _build_ydl_opts(cookie_file_path: str = ""):
     ydl_opts = {
         "quiet": True,
@@ -118,12 +325,11 @@ def _build_format_choices(format_id: str, is_audio: bool):
         return ["bestaudio/best"]
 
     requested = str(format_id or "").strip()
-    choices = []
+    fallback = "bestvideo+bestaudio/best"
     if requested:
-        choices.append(f"{requested}+bestaudio")
-        choices.append(requested)
-    choices.append("bestvideo+bestaudio")
-    choices.append("best")
+        choices = [requested, fallback]
+    else:
+        choices = [fallback]
 
     deduped = []
     seen = set()
@@ -263,6 +469,13 @@ def fetch_settings() -> PluginSettings:
         overwrite_existing_files = as_bool(
             user_settings.get("overwrite_existing_files", True), True
         )
+        trim_mode = _normalize_trim_mode(
+            user_settings.get("trim_mode")
+            or user_settings.get("timed_download_mode")
+        )
+        delete_original_after_trim = as_bool(
+            user_settings.get("delete_original_after_trim", False), False
+        )
         cookie_file_path, cookie_file_error = _resolve_cookie_file_settings(
             user_settings
         )
@@ -273,6 +486,8 @@ def fetch_settings() -> PluginSettings:
         pref_audio_format = "mp3"
         auto_open_folder = False
         overwrite_existing_files = True
+        trim_mode = TRIM_MODE_OFF
+        delete_original_after_trim = False
         cookie_file_path = ""
         cookie_file_error = ""
 
@@ -283,6 +498,8 @@ def fetch_settings() -> PluginSettings:
         preferred_audio_format=pref_audio_format,
         auto_open_folder=auto_open_folder,
         overwrite_existing_files=overwrite_existing_files,
+        trim_mode=trim_mode,
+        delete_original_after_trim=delete_original_after_trim,
         cookie_file_path=cookie_file_path,
         cookie_file_error=cookie_file_error,
     )
@@ -345,11 +562,19 @@ def query(query: str) -> ResultResponse:
     if not query.strip():
         return send_results([init_results(plugin_settings.download_path)])
 
-    if not is_valid_url(query):
+    query_request = _parse_query_request(query)
+    url = query_request.url
+    download_section = query_request.download_section
+    trim_mode = plugin_settings.trim_mode
+
+    if not is_valid_url(url):
         return send_results([invalid_result()])
 
-    if not has_extractable_url_target(query):
+    if not has_extractable_url_target(url):
         return send_results([invalid_result()])
+
+    if download_section and trim_mode == TRIM_MODE_OFF:
+        return send_results([trim_disabled_result()])
 
     if plugin_settings.cookie_file_error:
         return send_results(
@@ -358,13 +583,13 @@ def query(query: str) -> ResultResponse:
 
     active_cookie_file_path = plugin_settings.cookie_file_path
     ydl = CustomYoutubeDL(params=_build_ydl_opts(active_cookie_file_path))
-    info = ydl.extract_info(query, download=False)
+    info = ydl.extract_info(url, download=False)
 
     if info is None:
         if active_cookie_file_path:
             active_cookie_file_path = ""
             ydl = CustomYoutubeDL(params=_build_ydl_opts())
-            info = ydl.extract_info(query, download=False)
+            info = ydl.extract_info(url, download=False)
 
     if info is None:
         if ydl.error_message:
@@ -375,7 +600,7 @@ def query(query: str) -> ResultResponse:
 
     if active_cookie_file_path and not formats and _get_raw_formats(info or {}):
         fallback_ydl = CustomYoutubeDL(params=_build_ydl_opts())
-        fallback_info = fallback_ydl.extract_info(query, download=False)
+        fallback_info = fallback_ydl.extract_info(url, download=False)
         fallback_formats = _build_formats(fallback_info or {})
         if fallback_info is not None and fallback_formats:
             ydl = fallback_ydl
@@ -413,6 +638,20 @@ def query(query: str) -> ResultResponse:
     thumbnail = str(info.get("thumbnail") or "")
     full_title = str(info.get("title") or "Unknown Title")
     title = full_title[:50] + "..." if len(full_title) > 50 else full_title
+    download_context = DownloadContext(
+        url=url,
+        download_path=plugin_settings.download_path,
+        pref_video_path=plugin_settings.preferred_video_format,
+        pref_audio_path=plugin_settings.preferred_audio_format,
+        auto_open_folder=plugin_settings.auto_open_folder,
+        overwrite_existing_files=plugin_settings.overwrite_existing_files,
+        cookie_file_path=active_cookie_file_path,
+        download_section=download_section,
+        trim_start_time=query_request.start_time,
+        trim_end_time=query_request.end_time,
+        trim_mode=trim_mode,
+        delete_original_after_trim=plugin_settings.delete_original_after_trim,
+    )
 
     # Find best video (highest resolution, then highest bitrate)
     video_formats = [
@@ -431,15 +670,9 @@ def query(query: str) -> ResultResponse:
             )
             results.append(
                 best_video_result(
-                    query,
+                    download_context,
                     thumbnail,
                     best_video,
-                    plugin_settings.download_path,
-                    plugin_settings.preferred_video_format,
-                    plugin_settings.preferred_audio_format,
-                    plugin_settings.auto_open_folder,
-                    plugin_settings.overwrite_existing_files,
-                    active_cookie_file_path,
                 )
             )
         except (ValueError, TypeError) as e:
@@ -452,15 +685,9 @@ def query(query: str) -> ResultResponse:
             best_audio = max(audio_formats, key=lambda x: numeric_value(x.get("tbr")))
             results.append(
                 best_audio_result(
-                    query,
+                    download_context,
                     thumbnail,
                     best_audio,
-                    plugin_settings.download_path,
-                    plugin_settings.preferred_video_format,
-                    plugin_settings.preferred_audio_format,
-                    plugin_settings.auto_open_folder,
-                    plugin_settings.overwrite_existing_files,
-                    active_cookie_file_path,
                 )
             )
         except (ValueError, TypeError) as e:
@@ -469,16 +696,10 @@ def query(query: str) -> ResultResponse:
     results.extend(
         [
             query_result(
-                query,
+                download_context,
                 thumbnail,
                 title,
                 format,
-                plugin_settings.download_path,
-                plugin_settings.preferred_video_format,
-                plugin_settings.preferred_audio_format,
-                plugin_settings.auto_open_folder,
-                plugin_settings.overwrite_existing_files,
-                active_cookie_file_path,
             )
             for format in formats
         ]
@@ -497,6 +718,11 @@ def download(
     auto_open_folder: bool = False,
     overwrite_existing_files: bool = True,
     cookie_file_path: str = "",
+    download_section: str = "",
+    trim_start_time: str = "",
+    trim_end_time: str = "",
+    trim_mode: str = TRIM_MODE_OFF,
+    delete_original_after_trim: bool = False,
 ) -> None:
     if check_ytdlp_version(CHECK_INTERVAL_DAYS):
         update_ytdlp_library()
@@ -505,6 +731,10 @@ def download(
     ffmpeg_path = get_binaries_paths() or ""
     format_choices = _build_format_choices(format_id, is_audio)
 
+    trim_mode = _normalize_trim_mode(trim_mode)
+    download_section = str(download_section or "").strip()
+    has_trim_range = bool(download_section)
+    marker_path = ""
 
     command = [exe_path, url]
 
@@ -545,8 +775,6 @@ def download(
         "http:exp=1:20",
         "--retry-sleep",
         "fragment:exp=1:20",
-        "--http-chunk-size",
-        "10M",
     ]
 
     if overwrite_existing_files:
@@ -561,6 +789,27 @@ def download(
                 f"Configured cookie file not found during download: {cookie_file_path}"
             )
 
+    if has_trim_range and trim_mode == TRIM_MODE_NATIVE_SECTION:
+        command += [
+            "--progress",
+            "--newline",
+            "--download-sections",
+            download_section,
+            "--downloader-args",
+            "ffmpeg:-stats -stats_period 1 -progress pipe:2",
+        ]
+    elif has_trim_range and trim_mode == TRIM_MODE_DOWNLOAD_THEN_TRIM:
+        marker_path = _create_trim_marker_path()
+        command += [
+            "--quiet",
+            "--progress",
+            "--print-to-file",
+            "after_move:filepath",
+            marker_path,
+        ]
+    else:
+        command += ["--quiet", "--progress"]
+
     if _node_js_runtime_available():
         command += ["--js-runtimes", "node"]
 
@@ -574,7 +823,7 @@ def download(
     try:
         result = None
         attempted_formats = []
-        for index, format_choice in enumerate(format_choices, start=1):
+        for index, format_choice in enumerate(format_choices):
             attempt_command = command[:2] + ["-f", format_choice] + command[2:]
             attempted_formats.append(format_choice)
 
@@ -584,16 +833,37 @@ def download(
             result = subprocess.run(attempt_command)
             if result.returncode == 0:
                 break
+            if index + 1 < len(format_choices):
+                log_message(
+                    "Selected format failed with exit code "
+                    f"{result.returncode}; retrying best available video."
+                )
 
         if result.returncode != 0:
             log_message(
                 "All download attempts failed. Last exit code "
                 f"{result.returncode}. Formats tried: {', '.join(attempted_formats)}"
             )
+        elif has_trim_range and trim_mode == TRIM_MODE_DOWNLOAD_THEN_TRIM:
+            final_path = _read_final_path_marker(marker_path)
+            if final_path:
+                _run_post_trim(
+                    final_path,
+                    trim_start_time,
+                    trim_end_time,
+                    ffmpeg_path,
+                    overwrite_existing_files,
+                    delete_original_after_trim,
+                )
+            else:
+                log_message("Post-trim skipped. Downloaded file path was not reported.")
+
         if result.returncode == 0 and auto_open_folder and os.path.isdir(download_path):
             os.startfile(download_path)
     except Exception as e:
         log_exception("Download command failed", e)
+    finally:
+        _delete_file_if_exists(marker_path)
 
 
 if __name__ == "__main__":
