@@ -807,6 +807,27 @@ def download(
                 f"Configured cookie file not found during download: {cookie_file_path}"
             )
 
+    if has_trim_range and trim_mode == TRIM_MODE_NATIVE_SECTION:
+        command += [
+            "--progress",
+            "--newline",
+            "--download-sections",
+            download_section,
+            "--downloader-args",
+            "ffmpeg:-stats -stats_period 1 -progress pipe:2",
+        ]
+    elif has_trim_range and trim_mode == TRIM_MODE_DOWNLOAD_THEN_TRIM:
+        marker_path = _create_trim_marker_path()
+        command += [
+            "--quiet",
+            "--progress",
+            "--print-to-file",
+            "after_move:filepath",
+            marker_path,
+        ]
+    else:
+        command += ["--quiet", "--progress"]
+
     if _node_js_runtime_available():
         command += ["--js-runtimes", "node"]
 
@@ -820,7 +841,7 @@ def download(
     try:
         result = None
         attempted_formats = []
-        for index, format_choice in enumerate(format_choices, start=1):
+        for format_choice in format_choices:
             attempt_command = command[:2] + ["-f", format_choice] + command[2:]
             attempted_formats.append(format_choice)
 
@@ -836,10 +857,26 @@ def download(
                 "All download attempts failed. Last exit code "
                 f"{result.returncode}. Formats tried: {', '.join(attempted_formats)}"
             )
+        elif has_trim_range and trim_mode == TRIM_MODE_DOWNLOAD_THEN_TRIM:
+            final_path = _read_final_path_marker(marker_path)
+            if final_path:
+                _run_post_trim(
+                    final_path,
+                    trim_start_time,
+                    trim_end_time,
+                    ffmpeg_path,
+                    overwrite_existing_files,
+                    delete_original_after_trim,
+                )
+            else:
+                log_message("Post-trim skipped. Downloaded file path was not reported.")
+
         if result.returncode == 0 and auto_open_folder and os.path.isdir(download_path):
             os.startfile(download_path)
     except Exception as e:
         log_exception("Download command failed", e)
+    finally:
+        _delete_file_if_exists(marker_path)
 
 
 if __name__ == "__main__":
