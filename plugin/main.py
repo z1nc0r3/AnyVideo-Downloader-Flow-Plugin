@@ -662,6 +662,11 @@ def query(query: str) -> ResultResponse:
                     plugin_settings.auto_open_folder,
                     plugin_settings.overwrite_existing_files,
                     active_cookie_file_path,
+                    download_section,
+                    query_request.start_time,
+                    query_request.end_time,
+                    trim_mode,
+                    plugin_settings.delete_original_after_trim,
                 )
             )
         except (ValueError, TypeError) as e:
@@ -674,7 +679,7 @@ def query(query: str) -> ResultResponse:
             best_audio = max(audio_formats, key=lambda x: numeric_value(x.get("tbr")))
             results.append(
                 best_audio_result(
-                    query,
+                    url,
                     thumbnail,
                     best_audio,
                     plugin_settings.download_path,
@@ -683,6 +688,11 @@ def query(query: str) -> ResultResponse:
                     plugin_settings.auto_open_folder,
                     plugin_settings.overwrite_existing_files,
                     active_cookie_file_path,
+                    download_section,
+                    query_request.start_time,
+                    query_request.end_time,
+                    trim_mode,
+                    plugin_settings.delete_original_after_trim,
                 )
             )
         except (ValueError, TypeError) as e:
@@ -691,7 +701,7 @@ def query(query: str) -> ResultResponse:
     results.extend(
         [
             query_result(
-                query,
+                url,
                 thumbnail,
                 title,
                 format,
@@ -701,6 +711,11 @@ def query(query: str) -> ResultResponse:
                 plugin_settings.auto_open_folder,
                 plugin_settings.overwrite_existing_files,
                 active_cookie_file_path,
+                download_section,
+                query_request.start_time,
+                query_request.end_time,
+                trim_mode,
+                plugin_settings.delete_original_after_trim,
             )
             for format in formats
         ]
@@ -719,6 +734,11 @@ def download(
     auto_open_folder: bool = False,
     overwrite_existing_files: bool = True,
     cookie_file_path: str = "",
+    download_section: str = "",
+    trim_start_time: str = "",
+    trim_end_time: str = "",
+    trim_mode: str = TRIM_MODE_OFF,
+    delete_original_after_trim: bool = False,
 ) -> None:
     if check_ytdlp_version(CHECK_INTERVAL_DAYS):
         update_ytdlp_library()
@@ -727,6 +747,10 @@ def download(
     ffmpeg_path = get_binaries_paths() or ""
     format_choices = _build_format_choices(format_id, is_audio)
 
+    trim_mode = _normalize_trim_mode(trim_mode)
+    download_section = str(download_section or "").strip()
+    has_trim_range = bool(download_section)
+    marker_path = ""
 
     command = [exe_path, url]
 
