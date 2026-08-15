@@ -469,7 +469,10 @@ def fetch_settings() -> PluginSettings:
         overwrite_existing_files = as_bool(
             user_settings.get("overwrite_existing_files", True), True
         )
-        trim_mode = _normalize_trim_mode(user_settings.get("trim_mode"))
+        trim_mode = _normalize_trim_mode(
+            user_settings.get("trim_mode")
+            or user_settings.get("timed_download_mode")
+        )
         delete_original_after_trim = as_bool(
             user_settings.get("delete_original_after_trim", False), False
         )
