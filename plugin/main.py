@@ -6,6 +6,7 @@
 import os
 import shutil
 import subprocess
+import uuid
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,6 +41,7 @@ from results import (
     error_result,
     empty_result,
     cookie_file_error_result,
+    trim_disabled_result,
     query_result,
     best_video_result,
     best_audio_result,
@@ -56,6 +58,7 @@ except ImportError:
     YTDLP_AVAILABLE = False
 
 PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
+PLUGIN_CACHE_DIR = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", ".cache"))
 CHECK_INTERVAL_DAYS = 7
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 MAX_FORMAT_RESULTS = 40
@@ -67,12 +70,6 @@ TRIM_MODES = (
     TRIM_MODE_DOWNLOAD_THEN_TRIM,
     TRIM_MODE_NATIVE_SECTION,
 )
-TRIM_MODE_ALIASES = {
-    "native": TRIM_MODE_NATIVE_SECTION,
-    "native_section": TRIM_MODE_NATIVE_SECTION,
-    "download_section": TRIM_MODE_NATIVE_SECTION,
-    "post_trim": TRIM_MODE_DOWNLOAD_THEN_TRIM,
-}
 
 plugin = Plugin()
 
@@ -85,7 +82,7 @@ class PluginSettings:
     preferred_audio_format: str
     auto_open_folder: bool
     overwrite_existing_files: bool
-    timed_download_mode: str = TRIM_MODE_OFF
+    trim_mode: str = TRIM_MODE_OFF
     delete_original_after_trim: bool = False
     cookie_file_path: str = ""
     cookie_file_error: str = ""
@@ -97,10 +94,6 @@ class QueryRequest:
     download_section: str = ""
     start_time: str = ""
     end_time: str = ""
-
-    @property
-    def has_time_range(self) -> bool:
-        return bool(self.download_section)
 
 
 def _normalize_download_path(download_path: str) -> str:
@@ -196,10 +189,6 @@ def _parse_query_request(query: str) -> QueryRequest:
         return QueryRequest(str(query or "").strip())
 
     return QueryRequest(" ".join(parts[:-2]), section, parts[-2].lower(), parts[-1].lower())
-
-
-def _quote_command(command):
-    return " ".join(shlex.quote(str(arg)) for arg in command)
 
 
 def _create_trim_marker_path() -> str:
