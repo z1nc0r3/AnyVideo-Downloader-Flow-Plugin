@@ -45,6 +45,54 @@ class TestCookieFileSettings:
         assert cookie_error == ""
 
 
+class TestCustomYtdlpArguments:
+    def test_unicode_safe_defaults(self, monkeypatch):
+        class FakePlugin:
+            settings = {}
+
+        monkeypatch.setattr(main, "plugin", FakePlugin())
+        args = main._configured_ytdlp_arguments()
+        assert "--windows-filenames" in args
+        assert "--restrict-filenames" not in args
+        assert args[args.index("--output") + 1] == "%(title).100s.%(ext)s"
+        assert args[args.index("--retries") + 1] == "10"
+
+    def test_user_can_edit_defaults_and_opt_into_ascii(self, monkeypatch):
+        class FakePlugin:
+            settings = {"ytdlp_arguments": '--output "%(title)s.%(ext)s" --restrict-filenames'}
+
+        monkeypatch.setattr(main, "plugin", FakePlugin())
+        assert main._configured_ytdlp_arguments() == [
+            "--output", "%(title)s.%(ext)s", "--restrict-filenames"
+        ]
+
+    def test_unicode_windows_path_quoted(self, monkeypatch):
+        class FakePlugin:
+            settings = {"ytdlp_arguments": r'--download-archive "C:\Users\user\Мой архив.txt"'}
+
+        monkeypatch.setattr(main, "plugin", FakePlugin())
+        assert main._configured_ytdlp_arguments() == [
+            "--download-archive", r"C:\Users\user\Мой архив.txt"
+        ]
+
+    def test_explicit_empty_field_omits_optional_args(self, monkeypatch):
+        class FakePlugin:
+            settings = {"ytdlp_arguments": ""}
+
+        monkeypatch.setattr(main, "plugin", FakePlugin())
+        assert main._configured_ytdlp_arguments() == []
+
+    def test_invalid_quoting_fails_clearly(self, monkeypatch):
+        import pytest
+
+        class FakePlugin:
+            settings = {"ytdlp_arguments": '--output "unterminated'}
+
+        monkeypatch.setattr(main, "plugin", FakePlugin())
+        with pytest.raises(ValueError, match="Invalid yt-dlp arguments"):
+            main._configured_ytdlp_arguments()
+
+
 class TestYdlOptions:
     def test_build_ydl_opts_without_cookie_file(self, monkeypatch):
         monkeypatch.setattr(main, "_node_js_runtime_available", lambda: False)
@@ -303,6 +351,45 @@ class TestDownloadCommand:
         assert "--extractor-retries" in command
         assert "--http-chunk-size" not in command
         assert "--no-part" not in command
+        assert "--windows-filenames" in command
+        assert "--restrict-filenames" not in command
+        assert command[command.index("--output") + 1] == "%(title).100s.%(ext)s"
+
+    def test_uses_custom_yt_dlp_options(self, monkeypatch, tmp_path):
+        captured = []
+
+        class FakePlugin:
+            settings = {"ytdlp_arguments": '--output "%(title)s.%(ext)s" --embed-metadata'}
+
+        class Success:
+            returncode = 0
+
+        monkeypatch.setattr(main, "plugin", FakePlugin())
+        monkeypatch.setattr(main, "check_ytdlp_version", lambda interval: False)
+        monkeypatch.setattr(main, "get_binaries_paths", lambda: "")
+        monkeypatch.setattr(main, "_node_js_runtime_available", lambda: False)
+        monkeypatch.setattr(main.subprocess, "run", lambda command: (captured.append(command), Success())[1])
+
+        main.download("https://example.com/video", "18", str(tmp_path), "mp4", "mp3", False)
+        command = captured[0]
+        assert command[command.index("--output") + 1] == "%(title)s.%(ext)s"
+        assert "--embed-metadata" in command
+        assert "--restrict-filenames" not in command
+
+    def test_bad_user_args_never_launch_downloader(self, monkeypatch, tmp_path):
+        messages = []
+
+        class FakePlugin:
+            settings = {"ytdlp_arguments": '--output "unterminated'}
+
+        monkeypatch.setattr(main, "plugin", FakePlugin())
+        monkeypatch.setattr(main, "check_ytdlp_version", lambda interval: False)
+        monkeypatch.setattr(main, "get_binaries_paths", lambda: "")
+        monkeypatch.setattr(main, "log_message", messages.append)
+        monkeypatch.setattr(main.subprocess, "run", lambda command: (_ for _ in ()).throw(AssertionError("Unexpected download")))
+
+        main.download("https://example.com/video", "18", str(tmp_path), "mp4", "mp3", False)
+        assert any("Invalid yt-dlp arguments" in msg for msg in messages)
 
     def test_download_falls_back_to_best_video_after_selected_format_failure(
         self, monkeypatch, tmp_path

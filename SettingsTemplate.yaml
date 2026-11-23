@@ -93,6 +93,19 @@ body:
           defaultValue: ""
     - type: separator
       attributes:
+          name: yt_dlp_options_separator
+    - type: textBlock
+      attributes:
+          name: yt_dlp_options_section
+          description: "Advanced yt-dlp options"
+    - type: input
+      attributes:
+          name: ytdlp_arguments
+          label: "yt-dlp arguments:"
+          description: "Editable yt-dlp options. Quote values containing spaces. --restrict-filenames removes Unicode, so it is omitted by default. Format, download path, cookies and trimming are controlled separately. Clear to omit these optional flags."
+          defaultValue: '--output "%(title).100s.%(ext)s" --windows-filenames --trim-filenames 100 --no-mtime --no-playlist --retries 10 --fragment-retries 10 --file-access-retries 5 --extractor-retries 3 --retry-sleep http:exp=1:20 --retry-sleep fragment:exp=1:20'
+    - type: separator
+      attributes:
           name: video_trimming_separator
     - type: textBlock
       attributes:
