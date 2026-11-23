@@ -31,6 +31,7 @@
   - Sort by **FPS** _(NB: The FPS won't be available for some videos)_
 - Optional partial downloads with start and end times
 - Cookies support for websites that require login
+- Editable yt-dlp command-line arguments, with Unicode filenames by default
 
 
 ## Usage 👤
@@ -48,6 +49,16 @@
   - `Download then trim`: downloads normally, trims the finished file with ffmpeg, and optionally deletes the original after a successful trim.
   - `Native section download`: uses yt-dlp's `--download-sections` support. yt-dlp delegates ranged downloads to ffmpeg, so this can be slower or show less progress output than normal downloads on some websites.
 
+
+## Advanced yt-dlp arguments
+
+Open **Flow Launcher → Settings → Plugins → AnyVideo Downloader → Advanced yt-dlp options** to edit the **yt-dlp arguments** field. It contains the default yt-dlp flags so you can remove, replace or append options, as suggested in [issue #35](https://github.com/z1nc0r3/AnyVideo-Downloader-Flow-Plugin/issues/35).
+
+- Unicode filenames (including Cyrillic) now work by default: `--restrict-filenames` is not in the default flags. To require ASCII-only names, add it yourself. Keep `--windows-filenames` for Windows-safe output.
+- You can change the filename template (e.g. `--output "%(title)s.%(ext)s"`), set retry limits or add `--embed-metadata`. Quote values containing spaces; for config files use yt-dlp's `--config-locations "C:\\path with spaces\\yt-dlp.conf"`.
+- An empty field removes all optional defaults; older installations without the field continue to receive the new Unicode-safe defaults.
+- Video/audio format, destination folder, cookies, trimming and progress remain managed by the existing plugin UI and download logic.
+- These flags affect the download subprocess; the initial format search uses yt-dlp's Python API and does not read this field. They are parsed as an argument array, never executed by a shell. Invalid quotes abort the download and write an error to the plugin log. Custom yt-dlp arguments are intended for advanced users.
 
 ## Contribution 🤝
 ### Feel free to contribute to this project by creating a pull request or opening an issue. Any kind of contribution is welcome!

@@ -4,6 +4,7 @@
 # Date: 2024-07-28
 
 import os
+import shlex
 import shutil
 import subprocess
 import uuid
@@ -63,6 +64,16 @@ PLUGIN_CACHE_DIR = os.path.abspath(os.path.join(PLUGIN_ROOT, "..", ".cache"))
 CHECK_INTERVAL_DAYS = 7
 DEFAULT_DOWNLOAD_PATH = str(Path.home() / "Downloads")
 MAX_FORMAT_RESULTS = 40
+# yt-dlp's optional CLI defaults are now editable in plugin settings.
+# Do not use --restrict-filenames by default: it strips Unicode letters.
+DEFAULT_YTDLP_ARGUMENTS = (
+    '--output "%(title).100s.%(ext)s" '
+    '--windows-filenames --trim-filenames 100 --no-mtime --no-playlist '
+    '--retries 10 --fragment-retries 10 --file-access-retries 5 '
+    '--extractor-retries 3 --retry-sleep http:exp=1:20 '
+    '--retry-sleep fragment:exp=1:20'
+)
+
 TRIM_MODE_OFF = "Off"
 TRIM_MODE_NATIVE_SECTION = "Native section download"
 TRIM_MODE_DOWNLOAD_THEN_TRIM = "Download then trim"
@@ -95,6 +106,25 @@ class QueryRequest:
     download_section: str = ""
     start_time: str = ""
     end_time: str = ""
+
+
+def _configured_ytdlp_arguments() -> list[str]:
+    """Read user-editable yt-dlp flags; never invoke a command shell.
+
+    Older settings without this field receive the Unicode-friendly defaults.
+    An explicitly empty field removes the optional arguments.
+    """
+    try:
+        raw = plugin.settings.get("ytdlp_arguments", DEFAULT_YTDLP_ARGUMENTS)
+    except (AttributeError, TypeError):
+        raw = DEFAULT_YTDLP_ARGUMENTS
+
+    if raw is None:
+        raw = DEFAULT_YTDLP_ARGUMENTS
+    try:
+        return shlex.split(str(raw))
+    except ValueError as exc:
+        raise ValueError(f"Invalid yt-dlp arguments in plugin settings: {exc}") from exc
 
 
 def _normalize_download_path(download_path: str) -> str:
@@ -752,30 +782,13 @@ def download(
         else:
             command += ["--remux-video", "mp4"]
 
-    command += [
-        "-P",
-        download_path,
-        "--output",
-        "%(title).100s.%(ext)s",
-        "--windows-filenames",
-        "--restrict-filenames",
-        "--trim-filenames",
-        "100",
-        "--no-mtime",
-        "--no-playlist",
-        "--retries",
-        "10",
-        "--fragment-retries",
-        "10",
-        "--file-access-retries",
-        "5",
-        "--extractor-retries",
-        "3",
-        "--retry-sleep",
-        "http:exp=1:20",
-        "--retry-sleep",
-        "fragment:exp=1:20",
-    ]
+    command += ["-P", download_path]
+    try:
+        command += _configured_ytdlp_arguments()
+    except ValueError as exc:
+        # A broken quoted value should not launch a malformed yt-dlp command.
+        log_message(f"Download cancelled: {exc}")
+        return
 
     if overwrite_existing_files:
         command.append("--force-overwrites")
